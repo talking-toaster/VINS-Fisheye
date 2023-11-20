@@ -8,7 +8,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
 
 set(ENABLE_BACKWARD true)
 set(ENABLE_VWORKS false)
-set(DETECT_CUDA false)
+set(DETECT_CUDA true)
 #SET("OpenCV_DIR"  "/usr/local/share/OpenCV/")
 
 find_package(OpenMP REQUIRED)
@@ -21,7 +21,7 @@ find_package(catkin REQUIRED COMPONENTS
     geometry_msgs
     nav_msgs
     tf
-    cv_bridge
+    cv_bridge_local
     camera_models
     image_transport
     nodelet
@@ -81,6 +81,7 @@ include_directories(
   ${EIGEN3_INCLUDE_DIR}
   ${OpenCV_INCLUDE_DIRS}
   ${VisionWorks_INCLUDE_DIRS}
+  src/
 )
 
 message(STATUS "OpenCV library status:")
