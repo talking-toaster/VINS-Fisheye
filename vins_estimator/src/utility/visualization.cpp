@@ -121,12 +121,19 @@ void printStatistics(const Estimator &estimator, double t)
             eigen_T.block<3, 1>(0, 3) = estimator.tic[i];
             cv::Mat cv_T;
             cv::eigen2cv(eigen_T, cv_T);
-            if(i == 0)
+            if(i == 0){
                 fs << "body_T_cam0" << cv_T ;
-            else
+                //cout<<"body_T_cam0"<<endl<<eigen_T<<endl;
+            }
+                
+            else{
                 fs << "body_T_cam1" << cv_T ;
+                //cout<<"body_T_cam1"<<endl<<eigen_T<<endl;
+
+            }
+                
+        
         }
-        fs.release();
     }
 
     static double sum_of_time = 0;

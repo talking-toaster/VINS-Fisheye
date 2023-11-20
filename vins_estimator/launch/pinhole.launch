@@ -3,8 +3,8 @@
     <arg name="manager"     default="swarm_manager"/>
     <arg name="viz"     default="false"/>
     <arg name="internal_manager"     default="false"/>
-    <arg name="nodelet"     default="true"/>
-    <arg name="config_file" default="$(find vins)/../config/realsense/realsense_n3_unsync.yaml" />
+    <arg name="nodelet"     default="false"/>
+    <arg name="config_file" default="$(find vins)/../config/realsense_d455/realsense_stereo_imu_config.yaml" />
     <group if="$(arg nodelet)" >
         <node pkg="nodelet" type="nodelet" args="manager" name="/$(arg manager)" if="$(arg internal_manager)" output="$(arg output)" /> 
         <node pkg="nodelet" type="nodelet" name="vins_estimator" 

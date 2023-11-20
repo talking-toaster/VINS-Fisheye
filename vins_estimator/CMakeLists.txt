@@ -9,7 +9,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
 set(ENABLE_BACKWARD true)
 set(ENABLE_VWORKS false)
 set(DETECT_CUDA false)
-SET("OpenCV_DIR"  "/usr/local/share/OpenCV/")
+#SET("OpenCV_DIR"  "/usr/local/share/OpenCV/")
 
 find_package(OpenMP REQUIRED)
 

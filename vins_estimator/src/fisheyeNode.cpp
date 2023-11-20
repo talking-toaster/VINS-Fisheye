@@ -7,20 +7,6 @@
 
 using namespace FeatureTracker;     
 
-
-void VinsNodeBaseClass::fisheye_comp_imgs_callback(const sensor_msgs::CompressedImageConstPtr &img1_msg, const sensor_msgs::CompressedImageConstPtr &img2_msg) {
-    TicToc tic_input;
-    auto img1 = getImageFromMsg(img1_msg);
-    auto img2 = getImageFromMsg(img2_msg);
-
-    fisheye_handler->imgs_callback(img1_msg->header.stamp.toSec(), img1, img2);
-
-    if (img1_msg->header.stamp.toSec() - t_last > 0.11) {
-        ROS_WARN("Duration between two images is %fms", img1_msg->header.stamp.toSec() - t_last);
-    }
-    t_last = img1_msg->header.stamp.toSec();
-}
-
 void VinsNodeBaseClass::imgs_callback(const sensor_msgs::ImageConstPtr &img1_msg, const sensor_msgs::ImageConstPtr &img2_msg)
 {
     auto img1 = getImageFromMsg(img1_msg);
@@ -105,8 +91,9 @@ void VinsNodeBaseClass::Init(ros::NodeHandle & n)
         fisheye_handler->imgs_callback(0, mat, mat, true);
             estimator.inputFisheyeImage(0, 
             fisheye_handler->fisheye_up_imgs_cuda_gray, fisheye_handler->fisheye_down_imgs_cuda_gray, true);
-        */   
+          
         std::cout<< "Initialize with blank cost" << blank.toc() << std::endl;
+        */ 
     }
 
     sub_imu = n.subscribe(IMU_TOPIC, 2000, &VinsNodeBaseClass::imu_callback, (VinsNodeBaseClass*)this, ros::TransportHints().tcpNoDelay(true));
