@@ -1,3 +1,4 @@
+#pragma once
 #include "feature_tracker.h"
 #include "fisheye_undist.hpp"
 

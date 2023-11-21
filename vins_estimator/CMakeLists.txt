@@ -106,6 +106,47 @@ generate_messages(
 
 catkin_package()
 
+# add_executable(vins_node 
+#     src/rosNodeFisheye.cpp
+#     src/fisheyeNode.cpp
+#     # depth_generation
+#     src/depth_generation/depth_estimator.cpp
+#     src/depth_generation/stereo_matching.cpp
+#     src/depth_generation/depth_camera_manager.cpp
+#     src/depth_generation/color_disparity_graph.cpp
+#     src/depth_generation/stereo_online_calib.cpp
+#     # estimator
+#     src/estimator/estimator.cpp
+#     src/estimator/feature_manager.cpp
+#     src/estimator/parameters.cpp
+#     # factor
+#     src/factor/marginalization_factor.cpp
+#     src/factor/pose_local_parameterization.cpp
+#     src/factor/projection_factor.cpp
+#     src/factor/projectionOneFrameTwoCamFactor.cpp
+#     src/factor/projectionTwoFrameOneCamFactor.cpp
+#     src/factor/projectionTwoFrameTwoCamFactor.cpp
+#     # featureTracker
+#     src/featureTracker/feature_tracker_fisheye_cuda.cpp
+#     src/featureTracker/feature_tracker_fisheye_vworks.cpp
+#     src/featureTracker/feature_tracker_fisheye.cpp
+#     src/featureTracker/feature_tracker_pinhole.cpp
+#     src/featureTracker/feature_tracker.cpp
+#     src/featureTracker/vworks_feature_tracker.cpp
+#     # initial
+#     src/initial/initial_aligment.cpp
+#     src/initial/initial_ex_rotation.cpp
+#     src/initial/initial_sfm.cpp
+#     src/initial/solve_5pts.cpp
+#     # utility
+#     src/utility/CameraPoseVisualization.cpp
+#     src/utility/ros_utility.cpp
+#     src/utility/utility.cpp
+#     src/utility/visualization.cpp
+# )
+# target_link_libraries(vins_node ${catkin_LIBRARIES} ${OpenCV_LIBS} ${VisionWorks_LIBRARIES} ${LIBSGM} ${LIBDW} ${CERES_LIBRARIES} OpenMP::OpenMP_CXX)
+
+
 add_library(stereo_depth SHARED
     src/depth_generation/depth_estimator.cpp
     src/depth_generation/stereo_matching.cpp

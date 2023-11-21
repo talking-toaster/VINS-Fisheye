@@ -118,7 +118,7 @@ cv::Mat DepthEstimator::ComputeDispartiyMap(cv::cuda::GpuMat & left, cv::cuda::G
         cv::Mat disparity;
         cv::cuda::GpuMat d_disparity;
 
-		sgmp->execute(leftRectify, rightRectify, d_disparity);
+		//sgmp->execute(leftRectify, rightRectify, d_disparity);
         d_disparity.download(disparity);
         
         cv::Mat mask = disparity == sgmp->getInvalidDisparity();

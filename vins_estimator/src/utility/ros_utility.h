@@ -1,8 +1,8 @@
+#pragma once
 #include <eigen3/Eigen/Dense>
 #include <geometry_msgs/Pose.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
-#include <utility/ros_cv_bridge.hpp>
 
 geometry_msgs::Pose pose_from_PQ(Eigen::Vector3d P, 
     const Eigen::Quaterniond & Q);

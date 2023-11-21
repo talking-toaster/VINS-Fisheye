@@ -12,6 +12,8 @@
 #include "feature_tracker.h"
 #include "../estimator/estimator.h"
 #include "fisheye_undist.hpp"
+#include "../utility/opencv_cuda.h"
+
 
 
 namespace FeatureTracker {

@@ -1,4 +1,4 @@
-#pragma
+#pragma once
 #ifdef OVX
 #include <OVX/UtilityOVX.hpp>
 #else 
