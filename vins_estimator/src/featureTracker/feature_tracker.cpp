@@ -490,7 +490,7 @@ vector<cv::Point2f> opticalflow_track(cv::cuda::GpuMat & cur_img,
                         bool is_lr_track, std::map<int, cv::Point2f> prediction_points) {
 
 
-    TicToc tic1;
+    TicToc t_og;
     auto cur_pyr = buildImagePyramid(cur_img);
     
     if (prev_pts.size() == 0) {
@@ -499,7 +499,6 @@ vector<cv::Point2f> opticalflow_track(cv::cuda::GpuMat & cur_img,
         return vector<cv::Point2f>();
     }
 
-    TicToc tic;
     vector<uchar> status;
 
     for (size_t i = 0; i < ids.size(); i ++) {
@@ -525,7 +524,7 @@ vector<cv::Point2f> opticalflow_track(cv::cuda::GpuMat & cur_img,
 
     vector<cv::Point2f> cur_pts = get_predict_pts(ids, prev_pts, prediction_points);
 
-    TicToc t_og;
+    
     cv::cuda::GpuMat prev_gpu_pts(prev_pts);
     cv::cuda::GpuMat cur_gpu_pts(cur_pts);
     cv::cuda::GpuMat gpu_status;
@@ -583,7 +582,7 @@ vector<cv::Point2f> opticalflow_track(cv::cuda::GpuMat & cur_img,
     }
 
     if (ENABLE_PERF_OUTPUT) {
-        ROS_INFO("Optical flow costs: %fms Pts %ld", t_og.toc(), ids.size());
+        ROS_INFO("Optical flow costs: %fms Pts %ld in GPU", t_og.toc(), ids.size());
     }
 
     //printf("track cnt %d\n", (int)ids.size());

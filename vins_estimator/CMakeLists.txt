@@ -5,6 +5,10 @@ set(CMAKE_BUILD_TYPE "Release")
 set(CMAKE_CXX_FLAGS "-std=c++14 -fopenmp")
 #-DEIGEN_USE_MKL_ALL")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
+set(CMAKE_CXX_FLAGS_DEBUG "-fdiagnostics-color=auto ")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-variable -Wno-unused-but-set-variable") # 关闭未使用变量警告
+set(CMAKE_EXPORT_COMPILE_COMMANDS true) # 生成compile_commands.json
+
 
 set(ENABLE_BACKWARD true)
 set(ENABLE_VWORKS false)
@@ -210,5 +214,5 @@ target_link_libraries(fisheyeNode_lib ${catkin_LIBRARIES} ${OpenCV_LIBS} ${Visio
 add_executable(vins_node src/rosNodeFisheye.cpp)
 target_link_libraries(vins_node vins_lib fisheyeNode_lib estimator_lib vins_frontend stereo_depth vins_factors_lib vins_params_lib)
 
-add_library(vins_nodelet_lib src/rosNodelet.cpp)
-target_link_libraries(vins_nodelet_lib vins_lib fisheyeNode_lib estimator_lib vins_frontend stereo_depth vins_factors_lib vins_params_lib OpenMP::OpenMP_CXX)
+# add_library(vins_nodelet_lib src/rosNodelet.cpp)
+# target_link_libraries(vins_nodelet_lib vins_lib fisheyeNode_lib estimator_lib vins_frontend stereo_depth vins_factors_lib vins_params_lib OpenMP::OpenMP_CXX)
