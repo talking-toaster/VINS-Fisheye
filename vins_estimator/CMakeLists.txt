@@ -7,6 +7,7 @@ set(CMAKE_CXX_FLAGS "-std=c++14 -fopenmp")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
 set(CMAKE_CXX_FLAGS_DEBUG "-fdiagnostics-color=auto ")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-variable -Wno-unused-but-set-variable") # 关闭未使用变量警告
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations") # 关闭未使用变量警告
 set(CMAKE_EXPORT_COMPILE_COMMANDS true) # 生成compile_commands.json
 
 
@@ -148,23 +149,11 @@ catkin_package()
 #     src/utility/utility.cpp
 #     src/utility/visualization.cpp
 # )
-# target_link_libraries(vins_node ${catkin_LIBRARIES} ${OpenCV_LIBS} ${VisionWorks_LIBRARIES} ${LIBSGM} ${LIBDW} ${CERES_LIBRARIES} OpenMP::OpenMP_CXX)
+# target_link_libraries(vins_node ${catkin_LIBRARIES} ${OpenCV_LIBS}  ${LIBSGM} ${LIBDW} ${CERES_LIBRARIES} OpenMP::OpenMP_CXX)
 
-
-add_library(stereo_depth SHARED
-    src/depth_generation/depth_estimator.cpp
-    src/depth_generation/stereo_matching.cpp
-    src/depth_generation/depth_camera_manager.cpp
-    src/depth_generation/color_disparity_graph.cpp
-    src/depth_generation/stereo_online_calib.cpp
-)
 
 add_library(vins_frontend SHARED
-    src/featureTracker/feature_tracker.cpp
-    src/featureTracker/feature_tracker_fisheye_cuda.cpp
-    src/featureTracker/feature_tracker_fisheye_vworks.cpp
-    src/featureTracker/feature_tracker_fisheye.cpp
-    src/featureTracker/vworks_feature_tracker.cpp
+    src/featureTracker/feature_tracker_base.cpp
     src/featureTracker/feature_tracker_pinhole.cpp
 )
 
@@ -197,22 +186,24 @@ add_library(estimator_lib SHARED
 )
 
 add_library(fisheyeNode_lib SHARED
-     src/fisheyeNode.cpp)
+     src/vins_base.cpp)
 
 target_link_libraries(vins_lib ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRARIES} ${LIBDW})
 target_link_libraries(vins_params_lib ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRARIES} ${LIBDW})
 add_dependencies(vins_lib vins_generate_messages_cpp)
-target_link_libraries(stereo_depth ${catkin_LIBRARIES} ${OpenCV_LIBS} ${VisionWorks_LIBRARIES} ${LIBSGM} ${LIBDW})
-target_link_libraries(vins_frontend ${catkin_LIBRARIES} ${OpenCV_LIBS} ${VisionWorks_LIBRARIES} ${LIBDW} OpenMP::OpenMP_CXX)
-target_link_libraries(estimator_lib vins_params_lib vins_lib stereo_depth ${catkin_LIBRARIES} ${OpenCV_LIBS} ${VisionWorks_LIBRARIES} ${LIBDW})
-target_link_libraries(fisheyeNode_lib ${catkin_LIBRARIES} ${OpenCV_LIBS} ${VisionWorks_LIBRARIES} ${LIBDW} OpenMP::OpenMP_CXX)
+target_link_libraries(vins_frontend ${catkin_LIBRARIES} ${OpenCV_LIBS}  ${LIBDW} OpenMP::OpenMP_CXX)
+target_link_libraries(estimator_lib vins_params_lib vins_lib ${catkin_LIBRARIES} ${OpenCV_LIBS}  ${LIBDW})
+target_link_libraries(fisheyeNode_lib ${catkin_LIBRARIES} ${OpenCV_LIBS}  ${LIBDW} OpenMP::OpenMP_CXX)
 
 
 # add_executable(vins_node src/rosNodeTest.cpp)
-# target_link_libraries(vins_node vins_lib estimator_lib vins_frontend stereo_depth vins_factors_lib vins_params_lib)
+# target_link_libraries(vins_node vins_lib estimator_lib vins_frontend vins_factors_lib vins_params_lib)
 
-add_executable(vins_node src/rosNodeFisheye.cpp)
-target_link_libraries(vins_node vins_lib fisheyeNode_lib estimator_lib vins_frontend stereo_depth vins_factors_lib vins_params_lib)
+add_executable(vins_node src/vins_node.cpp)
+target_link_libraries(vins_node vins_lib fisheyeNode_lib estimator_lib vins_frontend vins_factors_lib vins_params_lib)
+
+add_executable(vins_test src/vins_test.cpp)
+target_link_libraries(vins_test vins_lib fisheyeNode_lib estimator_lib vins_frontend vins_factors_lib vins_params_lib)
 
 # add_library(vins_nodelet_lib src/rosNodelet.cpp)
-# target_link_libraries(vins_nodelet_lib vins_lib fisheyeNode_lib estimator_lib vins_frontend stereo_depth vins_factors_lib vins_params_lib OpenMP::OpenMP_CXX)
+# target_link_libraries(vins_nodelet_lib vins_lib fisheyeNode_lib estimator_lib vins_frontend vins_factors_lib vins_params_lib OpenMP::OpenMP_CXX)

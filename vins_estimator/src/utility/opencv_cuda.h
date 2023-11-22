@@ -16,21 +16,13 @@ namespace cuda {
 #ifndef HAVE_OPENCV_CUDAIMGPROC
 // typedef cv::Mat GpuMat;
 #endif
-};
-};
+}; // namespace cuda
+}; // namespace cv
 #endif
 
-#ifdef WITH_VWORKS
-#include <NVX/nvx.h>
-#include <NVX/nvx_opencv_interop.hpp>
-#ifdef OVX
-extern ovxio::ContextGuard context;
-#else 
-extern vx_context context;
-#endif
-#endif
 
 
 typedef std::pair<Eigen::Matrix3d, Eigen::Vector3d> EigenPose;
-typedef std::vector<cv::Mat> CvImages;
-typedef std::vector<cv::cuda::GpuMat> CvCudaImages;
+typedef std::vector<cv::Mat>						CvImages;
+typedef std::vector<cv::cuda::GpuMat>				CvCudaImages;
+typedef std::shared_ptr<cv::Mat>					CVImagePtr;

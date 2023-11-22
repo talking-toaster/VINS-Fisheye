@@ -8,11 +8,8 @@
  *******************************************************/
 
 #include "estimator.h"
-#include "../utility/visualization.h"
-#include "../featureTracker/fisheye_undist.hpp"
-#include "../depth_generation/depth_camera_manager.h"
-#include "../featureTracker/feature_tracker_fisheye.hpp"
-#include "../featureTracker/feature_tracker_pinhole.hpp"
+#include "utility/visualization.h"
+#include "featureTracker/feature_tracker_pinhole.hpp"
 
 Estimator::Estimator() : f_manager{Rs} {
 	ROS_INFO("init begins");
@@ -57,22 +54,17 @@ void Estimator::setParameter() {
 }
 
 void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1) {
-	static int	  img_track_count = 0;
-	static double sum_time		  = 0;
-	inputImageCnt++;
 	FeatureFrame featureFrame;
-	TicToc		 featureTrackerTime;
 
 	featureFrame = featureTracker->trackImage(t, _img, _img1);
 
-	double dt = featureTrackerTime.toc();
-	sum_time += dt;
-	img_track_count++;
+	if (SHOW_TRACK)
+		image_show_buf.push(featureTracker->image_show);
 
-	if (inputImageCnt % 2 == 0) {
-		mBuf.lock();
+	if ((++inputImageCnt) > 1) {
+		// 原版是下面每2帧处理一次，这里改成每帧都处理，注意第一帧为空白帧(启动gpu)，传入会导致初始值无穷大
+		// if ((inputImageCnt) % 2 == 0) {
 		featureBuf.push(make_pair(t, featureFrame));
-		mBuf.unlock();
 	}
 }
 
@@ -113,9 +105,9 @@ void Estimator::inputIMU(double t, const Vector3d &linearAcceleration, const Vec
 }
 
 void Estimator::inputFeature(double t, const FeatureFrame &featureFrame) {
-	mBuf.lock();
+	// mBuf.lock();
 	featureBuf.push(make_pair(t, featureFrame));
-	mBuf.unlock();
+	// mBuf.unlock();
 }
 
 
@@ -171,21 +163,23 @@ bool Estimator::IMUAvailable(double t) {
 void Estimator::processMeasurements() {
 
 	while (1) {
-		// printf("process measurments\n");
 		TicToc								  t_process;
 		pair<double, FeatureFrame>			  feature;
 		vector<pair<double, Eigen::Vector3d>> accVector, gyrVector;
-		if (!featureBuf.empty()) {
-			feature = featureBuf.front();
+		if (featureBuf.try_pop(feature)) {
+			if (solver_flag == Estimator::SolverFlag::NON_LINEAR) {
+				while (featureBuf.try_pop(feature))
+					;
+			}
+
 
 			curTime = feature.first + td;
 			while (1) {
-				if ((IMUAvailable(feature.first + td)))
+				if ((IMUAvailable(curTime)))
 					break;
 				else {
-					printf("wait for imu ... TD%f\n", td);
-					std::chrono::milliseconds dura(5);
-					std::this_thread::sleep_for(dura);
+					ROS_INFO_THROTTLE(0.1, "wait for imu ... TD%f\n", td);
+					std::this_thread::sleep_for(std::chrono::milliseconds(5));
 				}
 			}
 			mBuf.lock();
@@ -196,8 +190,6 @@ void Estimator::processMeasurements() {
 							 accVector.size() / (curTime - prevTime));
 				}
 			}
-
-			featureBuf.pop();
 			mBuf.unlock();
 
 			if (USE_IMU) {
@@ -218,14 +210,13 @@ void Estimator::processMeasurements() {
 			processImage(feature.second, feature.first);
 			prevTime = curTime;
 
-			printStatistics(*this, 0);
+			printStatistics(*this, feature.first);
 
 			std_msgs::Header header;
 			header.frame_id = "world";
 			header.stamp	= ros::Time(feature.first);
 
 			pubIMUBias(latest_Ba, latest_Bg, header);
-			// These cost 5ms, ~1/6 percent on manifold2
 			pubOdometry(*this, header);
 			pubKeyPoses(*this, header);
 			pubCameraPose(*this, header);
@@ -233,17 +224,22 @@ void Estimator::processMeasurements() {
 			pubKeyframe(*this);
 			pubTF(*this, header);
 
-			double dt = t_process.toc();
-			mea_sum_time += dt;
-			mea_track_count++;
+
 
 			if (ENABLE_PERF_OUTPUT) {
+				double dt = t_process.toc();
+				mea_sum_time += dt;
+				mea_track_count++;
 				ROS_INFO("process measurement time: AVG %f NOW %f\n", mea_sum_time / mea_track_count, dt);
+				ROS_INFO("feature buf size:%d", int(featureBuf.size()));
+				// avg cost 5 ms
 			}
-		}
 
-		std::chrono::milliseconds dura(2);
-		std::this_thread::sleep_for(dura);
+
+		} else {
+			std::chrono::milliseconds dura(2);
+			std::this_thread::sleep_for(dura);
+		}
 	}
 }
 
@@ -828,8 +824,8 @@ void Estimator::optimization() {
 	TicToc				   t_solver;
 	ceres::Solver::Summary summary;
 	ceres::Solve(options, &problem, &summary);
-	// cout << summary.BriefReport() << endl;
-	std::cout << summary.FullReport() << endl;
+	cout << summary.BriefReport() << endl;
+	// std::cout << summary.FullReport() << endl;
 	static double sum_iterations = 0;
 	static double sum_solve_time = 0;
 	static int	  solve_count	 = 0;

@@ -1,8 +1,8 @@
 /*******************************************************
  * Copyright (C) 2019, Aerial Robotics Group, Hong Kong University of Science and Technology
- * 
+ *
  * This file is part of VINS.
- * 
+ *
  * Licensed under the GNU General Public License v3.0;
  * you may not use this file except in compliance with the License.
  *******************************************************/
@@ -38,7 +38,7 @@ extern ros::Publisher pub_key;
 extern ros::Publisher pub_bias;
 extern nav_msgs::Path path;
 extern ros::Publisher pub_pose_graph;
-extern int IMAGE_ROW, IMAGE_COL;
+extern int			  IMAGE_ROW, IMAGE_COL;
 
 void registerPub(ros::NodeHandle &n);
 
@@ -46,7 +46,7 @@ void pubLatestOdometry(const Eigen::Vector3d &P, const Eigen::Quaterniond &Q, co
 
 void pubIMUBias(const Eigen::Vector3d &Ba, const Eigen::Vector3d Bg, const std_msgs::Header &header);
 
-void printStatistics(const Estimator &estimator, double t);
+void printStatistics(const Estimator &estimator, double timestamp);
 
 void pubOdometry(const Estimator &estimator, const std_msgs::Header &header);
 

@@ -25,8 +25,8 @@ using namespace Eigen;
 #include <ros/assert.h>
 
 #include "parameters.h"
-#include "../utility/tic_toc.h"
-#include "../featureTracker/feature_tracker.h"
+#include "utility/tic_toc.h"
+#include "featureTracker/feature_tracker_base.h"
 #define KEYFRAME_LONGTRACK_THRES 20
 
 
