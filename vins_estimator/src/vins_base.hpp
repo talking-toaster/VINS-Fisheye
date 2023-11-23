@@ -16,6 +16,8 @@
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
 #include <sensor_msgs/CompressedImage.h>
+#include "estimator/depth_estimator.hpp"
+#include "utility/queue_wrapper.hpp"
 
 class Estimator;
 
@@ -24,13 +26,16 @@ class VinsNodeBaseClass {
 	message_filters::Subscriber<sensor_msgs::Image>							  *image_sub_r;
 	message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::Image> *sync;
 	std::thread																   show_track_thread;
+	std::thread																   depth_estimator_thread;
+	RW_Queue<std::pair<cv::Mat, cv::Mat>>									   stero_buf;
 
   public:
-	Estimator		estimator;
-	ros::Subscriber sub_imu;
-	ros::Subscriber sub_feature;
-	ros::Subscriber sub_restart;
-	ros::Subscriber flatten_sub;
+	Estimator			estimator;
+	vpi::DepthEstimator depth_estimator; // VPI 和 opencv CUDA 不兼容
+	ros::Subscriber		sub_imu;
+	ros::Subscriber		sub_feature;
+	ros::Subscriber		sub_restart;
+	ros::Subscriber		flatten_sub;
 
   protected:
 	void imgs_callback(const sensor_msgs::ImageConstPtr &img1_msg, const sensor_msgs::ImageConstPtr &img2_msg);

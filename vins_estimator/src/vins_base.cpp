@@ -8,7 +8,10 @@ void VinsNodeBaseClass::imgs_callback(const sensor_msgs::ImageConstPtr &img1_msg
 									  const sensor_msgs::ImageConstPtr &img2_msg) {
 	auto img1 = getImageFromMsg(img1_msg);
 	auto img2 = getImageFromMsg(img2_msg);
+	// cv::imwrite("/swarm/fisheye_ws/output/img_left1.png", img1->image);
+	// cv::imwrite("/swarm/fisheye_ws/output/img_right1.png", img2->image);
 	estimator.inputImage(img1_msg->header.stamp.toSec(), img1->image, img2->image);
+	// stero_buf.push(std::make_pair(img1->image, img2->image));
 }
 
 void VinsNodeBaseClass::imu_callback(const sensor_msgs::ImuConstPtr &imu_msg) {
@@ -52,12 +55,12 @@ void VinsNodeBaseClass::Init(ros::NodeHandle &n) {
 	registerPub(n);
 
 	// We use blank images to initialize cuda before every thing
-	if (USE_GPU) {
-		TicToc	t_gpu;
-		cv::Mat mat(WIDTH, HEIGHT, CV_8UC1);
-		estimator.inputImage(0, mat, mat);
-		ROS_INFO_STREAM("Initialize with blank cost " << t_gpu.toc() << " ms.");
-	}
+	// if (USE_GPU) {
+	// 	TicToc	t_gpu;
+	// 	cv::Mat mat(WIDTH, HEIGHT, CV_8UC1);
+	// 	estimator.inputImage(0, mat, mat);
+	// 	ROS_INFO_STREAM("Initialize with blank cost " << t_gpu.toc() << " ms.");
+	// }
 
 	sub_imu		= n.subscribe(IMU_TOPIC, 20, &VinsNodeBaseClass::imu_callback, (VinsNodeBaseClass *)this,
 							  ros::TransportHints().tcpNoDelay(true));
@@ -78,11 +81,26 @@ void VinsNodeBaseClass::Init(ros::NodeHandle &n) {
 			while (1) {
 				cv::Mat img_show;
 				while (estimator.image_show_buf.try_pop(img_show)) {
-					cv::imshow("track", img_show);
+					if (img_show.cols > 0)
+						cv::imshow("track", img_show);
 				}
 				cv::waitKey(1);
-				// std::this_thread::sleep_for(std::chrono::milliseconds(2));
 			}
 		});
 	}
+
+	// depth_estimator_thread = std::thread([&]() {
+	// 	while (1) {
+	// 		std::pair<cv::Mat, cv::Mat> stero_pair;
+	// 		if (stero_buf.try_pop(stero_pair)) {
+	// 			while (stero_buf.try_pop(stero_pair))
+	// 				;
+	// 			TicToc t_depth;
+	// 			depth_estimator.calculate_depth(stero_pair.first, stero_pair.second);
+	// 			ROS_INFO_STREAM("depth used: " << t_depth.toc() << " ms.");
+	// 			cv::imshow("depth", depth_estimator.depth_img);
+	// 			cv::waitKey(1);
+	// 		}
+	// 	}
+	// });
 }

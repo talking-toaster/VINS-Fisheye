@@ -4,16 +4,17 @@ project(vins)
 set(CMAKE_BUILD_TYPE "Release")
 set(CMAKE_CXX_FLAGS "-std=c++14 -fopenmp")
 #-DEIGEN_USE_MKL_ALL")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O0 -Wall -g")
 set(CMAKE_CXX_FLAGS_DEBUG "-fdiagnostics-color=auto ")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-variable -Wno-unused-but-set-variable") # 关闭未使用变量警告
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations") # 关闭未使用变量警告
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations") # ceres-solver版本过新，api变更警告
 set(CMAKE_EXPORT_COMPILE_COMMANDS true) # 生成compile_commands.json
 
 
 set(ENABLE_BACKWARD true)
 set(ENABLE_VWORKS false)
 set(DETECT_CUDA true)
+set(ENABLE_VPI true)
 #SET("OpenCV_DIR"  "/usr/local/share/OpenCV/")
 
 find_package(OpenMP REQUIRED)
@@ -35,10 +36,18 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 if(ENABLE_BACKWARD)
-    add_definitions(-D USE_BACKWARD)
     set(LIBDW "dw")
 else()
     set(LIBDW "")
+endif()
+
+if(ENABLE_VPI)
+    find_package(vpi REQUIRED)
+    message(WARNING "VPI detected, automatically USE OpenCV with VPI support")
+    set(LIBVPI "vpi")
+else()
+    add_definitions(-D WITHOUT_NVIDIA_VPI)
+    set(LIBVPI "")
 endif()
 
 if(DETECT_CUDA)
@@ -155,6 +164,7 @@ catkin_package()
 add_library(vins_frontend SHARED
     src/featureTracker/feature_tracker_base.cpp
     src/featureTracker/feature_tracker_pinhole.cpp
+    src/featureTracker/feature_tracker_vpi.cpp
 )
 
 
@@ -188,12 +198,12 @@ add_library(estimator_lib SHARED
 add_library(fisheyeNode_lib SHARED
      src/vins_base.cpp)
 
-target_link_libraries(vins_lib ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRARIES} ${LIBDW})
-target_link_libraries(vins_params_lib ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRARIES} ${LIBDW})
+target_link_libraries(vins_lib ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRARIES} ${LIBDW} ${LIBVPI})
+target_link_libraries(vins_params_lib ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRARIES} ${LIBDW} ${LIBVPI})
 add_dependencies(vins_lib vins_generate_messages_cpp)
-target_link_libraries(vins_frontend ${catkin_LIBRARIES} ${OpenCV_LIBS}  ${LIBDW} OpenMP::OpenMP_CXX)
-target_link_libraries(estimator_lib vins_params_lib vins_lib ${catkin_LIBRARIES} ${OpenCV_LIBS}  ${LIBDW})
-target_link_libraries(fisheyeNode_lib ${catkin_LIBRARIES} ${OpenCV_LIBS}  ${LIBDW} OpenMP::OpenMP_CXX)
+target_link_libraries(vins_frontend ${catkin_LIBRARIES} ${OpenCV_LIBS}  ${LIBDW} OpenMP::OpenMP_CXX ${LIBVPI})
+target_link_libraries(estimator_lib vins_params_lib vins_lib ${catkin_LIBRARIES} ${OpenCV_LIBS}  ${LIBDW} ${LIBVPI})
+target_link_libraries(fisheyeNode_lib ${catkin_LIBRARIES} ${OpenCV_LIBS}  ${LIBDW} OpenMP::OpenMP_CXX ${LIBVPI})
 
 
 # add_executable(vins_node src/rosNodeTest.cpp)

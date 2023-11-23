@@ -10,6 +10,7 @@
 #include "estimator.h"
 #include "utility/visualization.h"
 #include "featureTracker/feature_tracker_pinhole.hpp"
+#include "featureTracker/feature_tracker_vpi.hpp"
 
 Estimator::Estimator() : f_manager{Rs} {
 	ROS_INFO("init begins");
@@ -28,7 +29,8 @@ Estimator::Estimator() : f_manager{Rs} {
 void Estimator::setParameter() {
 
 	if (USE_GPU) {
-		featureTracker = new FeatureTracker::PinholeFeatureTrackerCuda(this);
+		// featureTracker = new FeatureTracker::PinholeFeatureTrackerCuda(this);
+		featureTracker = new FeatureTracker::FeatureTrackerVPI(this);
 	} else {
 		featureTracker = new FeatureTracker::PinholeFeatureTrackerCPU(this);
 	}
