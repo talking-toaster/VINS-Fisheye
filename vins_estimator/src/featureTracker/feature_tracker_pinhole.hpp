@@ -61,6 +61,8 @@ class PinholeFeatureTrackerCuda : public PinholeFeatureTracker<cv::cuda::GpuMat>
 									cv::InputArray _img1 = cv::noArray()) override;
 };
 
+
+
 class PinholeFeatureTrackerCPU : public PinholeFeatureTracker<cv::Mat> {
   public:
 	PinholeFeatureTrackerCPU(Estimator *_estimator) : PinholeFeatureTracker<cv::Mat>(_estimator) {

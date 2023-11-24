@@ -58,6 +58,13 @@ class BaseFeatureTracker {
 
 	virtual FeatureFrame trackImage(double _cur_time, cv::InputArray _img, cv::InputArray _img1 = cv::noArray()) = 0;
 
+	/**
+	 * status:
+	 * -1: in outlier，need remove
+	 * 1: Good pt; But not used for solving; Blue
+	 * 2: Bad pt; Red
+	 * 3: Good pt for solving; Green
+	 */
 	void setFeatureStatus(int feature_id, int status) {
 		this->pts_status[feature_id] = status;
 		if (status < 0) {

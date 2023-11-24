@@ -510,7 +510,7 @@ vector<cv::Point2f> opticalflow_track(cv::cuda::GpuMat &cur_img, std::vector<cv:
 	d_pyrLK_sparse->calc(prev_pyr, cur_pyr, prev_gpu_pts, cur_gpu_pts, gpu_status, gpu_err);
 
 	cur_gpu_pts.download(cur_pts);
-	gpu_err.download(err);
+	// gpu_err.download(err);
 
 	gpu_status.download(status);
 
@@ -582,9 +582,6 @@ void detectPoints(const cv::cuda::GpuMat &img, vector<cv::Point2f> &n_pts, vecto
 				  int require_pts) {
 	int lack_up_top_pts = require_pts - static_cast<int>(cur_pts.size());
 
-	TicToc tic;
-
-
 	if (lack_up_top_pts > require_pts / 4) {
 
 		// ROS_INFO("Lack %d pts; Require %d will detect %d", lack_up_top_pts, require_pts, lack_up_top_pts >
@@ -594,6 +591,7 @@ void detectPoints(const cv::cuda::GpuMat &img, vector<cv::Point2f> &n_pts, vecto
 		cv::cuda::GpuMat d_prevPts;
 		detector->detect(img, d_prevPts);
 
+		TicToc t_copy;
 
 		std::vector<cv::Point2f> n_pts_tmp;
 
@@ -603,7 +601,6 @@ void detectPoints(const cv::cuda::GpuMat &img, vector<cv::Point2f> &n_pts, vecto
 		} else {
 			n_pts_tmp.clear();
 		}
-
 		n_pts.clear();
 
 		std::vector<cv::Point2f> all_pts = cur_pts;
@@ -615,7 +612,6 @@ void detectPoints(const cv::cuda::GpuMat &img, vector<cv::Point2f> &n_pts, vecto
 					break;
 				}
 			}
-
 			if (!has_nearby) {
 				n_pts.push_back(pt);
 				all_pts.push_back(pt);

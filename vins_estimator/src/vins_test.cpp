@@ -29,6 +29,10 @@
 
 #include "featureTracker/feature_tracker_base.h"
 
+#include <opencv2/cudastereo.hpp>
+
+#include <libsgm.h>
+
 #define CHECK_STATUS(STMT)                                                                                             \
 	do {                                                                                                               \
 		VPIStatus _status__ = (STMT);                                                                                  \
@@ -94,13 +98,10 @@ std::string vpi_image_format_to_str(uint64_t format) {
 	}
 }
 
-cv::Mat depth1(double confidence) {
-	TicToc	t_read;
-	cv::Mat cv_left_img, cv_right_img;
-	cv_left_img	 = cv::imread("/swarm/fisheye_ws/output/img_left1.png", cv::IMREAD_GRAYSCALE);
-	cv_right_img = cv::imread("/swarm/fisheye_ws/output/img_right1.png", cv::IMREAD_GRAYSCALE);
-	int width	 = cv_left_img.cols;
-	int height	 = cv_left_img.rows;
+cv::Mat depth1(cv::Mat &img1, cv::Mat &img2, int disp_size, double confidence) {
+	TicToc t_read;
+	int	   width  = img1.cols;
+	int	   height = img1.rows;
 
 	ROS_INFO("time read:%3.1f ms", t_read.toc());
 
@@ -111,8 +112,8 @@ cv::Mat depth1(double confidence) {
 
 	TicToc t_create;
 	CHECK_STATUS(vpiStreamCreate(0, &stream));
-	CHECK_STATUS(vpiImageCreateWrapperOpenCVMat(cv_left_img, 0, &vpi_left_img));
-	CHECK_STATUS(vpiImageCreateWrapperOpenCVMat(cv_right_img, 0, &vpi_right_img));
+	CHECK_STATUS(vpiImageCreateWrapperOpenCVMat(img1, 0, &vpi_left_img));
+	CHECK_STATUS(vpiImageCreateWrapperOpenCVMat(img2, 0, &vpi_right_img));
 
 	// VPIImageFormat format;
 	// vpiImageGetFormat(vpi_left_img, &format);
@@ -167,168 +168,72 @@ cv::Mat depth1(double confidence) {
 
 	return cv_depth_img_color;
 }
+cv::Mat lib_sgm(cv::Mat &img1, cv::Mat &img2, int disp_size) {
+	// int	  disp_size	  = 64;
+	int	  P1		  = 10;
+	int	  P2		  = 120;
+	float uniqueness  = 0.95;
+	int	  num_paths	  = 8;
+	int	  min_disp	  = 0;
+	int	  LR_max_diff = 1;
+	auto  census_type = sgm::CensusType::SYMMETRIC_CENSUS_9x7;
 
-void depth2() {
+	const int			src_depth = img1.type() == CV_8U ? 8 : 16;
+	const int			dst_depth = 16;
+	const sgm::PathType path_type = num_paths == 8 ? sgm::PathType::SCAN_8PATH : sgm::PathType::SCAN_4PATH;
 
-	cv::Mat cvImageLeft, cvImageRight;
+	const sgm::StereoSGM::Parameters param(P1, P2, uniqueness, false, path_type, min_disp, LR_max_diff, census_type);
+	sgm::StereoSGM ssgm(img1.cols, img1.rows, disp_size, src_depth, dst_depth, sgm::EXECUTE_INOUT_HOST2HOST, param);
+	cv::Mat		   disparity(img1.size(), CV_16S);
+	ssgm.execute(img1.data, img2.data, disparity.data);
 
-	// VPI objects that will be used
-	VPIImage   inLeft		 = NULL;
-	VPIImage   inRight		 = NULL;
-	VPIImage   tmpLeft		 = NULL;
-	VPIImage   tmpRight		 = NULL;
-	VPIImage   stereoLeft	 = NULL;
-	VPIImage   stereoRight	 = NULL;
-	VPIImage   disparity	 = NULL;
-	VPIImage   confidenceMap = NULL;
-	VPIStream  stream		 = NULL;
-	VPIPayload stereo		 = NULL;
+	// create mask for invalid disp
+	const cv::Mat mask = disparity == ssgm.get_invalid_disparity();
 
-	int retval = 0;
+	cv::Mat disparity_8u, disparity_color;
+	disparity.convertTo(disparity_8u, CV_8U, 255.0 / disp_size, 0);
+	cv::applyColorMap(disparity_8u, disparity_color, cv::COLORMAP_TURBO);
+	// disparity_8u.setTo(cv::Scalar(0), mask);
+	// disparity_color.setTo(cv::Scalar(0, 0, 0), mask);
 
-	uint64_t backends = VPI_BACKEND_CUDA;
+	return disparity_color;
 
-	cvImageLeft = cv::imread("/swarm/fisheye_ws/output/img_left1.png");
-	if (cvImageLeft.empty())
-		throw std::runtime_error("Can't open  image");
-
-
-	cvImageRight = cv::imread("/swarm/fisheye_ws/output/img_right1.png");
-	if (cvImageRight.empty())
-		throw std::runtime_error("Can't open  image");
-
-
-
-	// =================================
-	// Allocate all VPI resources needed
-
-	int32_t width  = cvImageLeft.cols;
-	int32_t height = cvImageLeft.rows;
-
-	// Create the stream that will be used for processing.
-	CHECK_STATUS(vpiStreamCreate(0, &stream));
-
-	// We now wrap the loaded images into a VPIImage object to be used by VPI.
-	// VPI won't make a copy of it, so the original image must be in scope at all times.
-	CHECK_STATUS(vpiImageCreateWrapperOpenCVMat(cvImageLeft, 0, &inLeft)); // inLeft 为 VPI_IMAGE_FORMAT_BGR8
-	CHECK_STATUS(vpiImageCreateWrapperOpenCVMat(cvImageRight, 0, &inRight));
-
-	VPIImageFormat format;
-	vpiImageGetFormat(inLeft, &format);
-	ROS_INFO_STREAM("in image formate:" << vpi_image_format_to_str(format));
-
-	// Format conversion parameters needed for input pre-processing
-	VPIConvertImageFormatParams convParams;
-	CHECK_STATUS(vpiInitConvertImageFormatParams(&convParams));
-
-	// Set algorithm parameters to be used. Only values what differs from defaults will be overwritten.
-	VPIStereoDisparityEstimatorCreationParams stereoParams;
-	CHECK_STATUS(vpiInitStereoDisparityEstimatorCreationParams(&stereoParams));
-
-	// Default format and size for inputs and outputs
-	VPIImageFormat stereoFormat	   = VPI_IMAGE_FORMAT_Y16_ER;
-	VPIImageFormat disparityFormat = VPI_IMAGE_FORMAT_S16;
-
-	int stereoWidth	 = width;
-	int stereoHeight = height;
-	int outputWidth	 = width;
-	int outputHeight = height;
-
-	// Create the payload for Stereo Disparity algorithm.
-	// Payload is created before the image objects so that non-supported backends can be trapped with an error.
-	CHECK_STATUS(
-		vpiCreateStereoDisparityEstimator(backends, stereoWidth, stereoHeight, stereoFormat, &stereoParams, &stereo));
-
-	// Create the image where the disparity map will be stored.
-	CHECK_STATUS(vpiImageCreate(outputWidth, outputHeight, disparityFormat, 0, &disparity));
-
-	// Create the input stereo images
-	CHECK_STATUS(vpiImageCreate(stereoWidth, stereoHeight, stereoFormat, 0, &stereoLeft));
-	CHECK_STATUS(vpiImageCreate(stereoWidth, stereoHeight, stereoFormat, 0, &stereoRight));
-
-	// Create some temporary images, and the confidence image if the backend can support it
-
-	// CHECK_STATUS(vpiImageCreate(width, height, VPI_IMAGE_FORMAT_U16, 0, &confidenceMap));
-
-
-	// ================
-	// Processing stage
-
-	// -----------------
-	// Pre-process input
-
-	// Convert opencv input to grayscale format using CUDA
-	CHECK_STATUS(vpiSubmitConvertImageFormat(stream, VPI_BACKEND_CUDA, inLeft, stereoLeft,
-											 &convParams)); // stereoLeft VPI_IMAGE_FORMAT_Y16_ER
-	CHECK_STATUS(vpiSubmitConvertImageFormat(stream, VPI_BACKEND_CUDA, inRight, stereoRight, &convParams));
-
-
-	vpiImageGetFormat(stereoLeft, &format);
-	ROS_INFO_STREAM("stereo image formate:" << vpi_image_format_to_str(format));
-
-	// ------------------------------
-	// Do stereo disparity estimation
-
-	// Submit it with the input and output images
-	CHECK_STATUS(
-		vpiSubmitStereoDisparityEstimator(stream, backends, stereo, stereoLeft, stereoRight, disparity, NULL, NULL));
-
-	// Wait until the algorithm finishes processing
-	CHECK_STATUS(vpiStreamSync(stream));
-
-	vpiImageGetFormat(disparity, &format);
-	ROS_INFO_STREAM("disparity image formate:" << vpi_image_format_to_str(format));
-
-	// ========================================
-	// Output pre-processing and saving to disk
-	// Lock output to retrieve its data on cpu memory
-	VPIImageData data;
-	CHECK_STATUS(vpiImageLockData(disparity, VPI_LOCK_READ, VPI_IMAGE_BUFFER_HOST_PITCH_LINEAR, &data));
-
-	// Make an OpenCV matrix out of this image
-	cv::Mat cvDisparity;
-	CHECK_STATUS(vpiImageDataExportOpenCVMat(data, &cvDisparity));
-
-	// Scale result and write it to disk. Disparities are in Q10.5 format,
-	// so to map it to float, it gets divided by 32. Then the resulting disparity range,
-	// from 0 to stereo.maxDisparity gets mapped to 0-255 for proper output.
-	cvDisparity.convertTo(cvDisparity, CV_8UC1, 255.0 / (32 * stereoParams.maxDisparity), 0);
-
-	// Apply JET colormap to turn the disparities into color, reddish hues
-	// represent objects closer to the camera, blueish are farther away.
-	cv::Mat cvDisparityColor;
-	applyColorMap(cvDisparity, cvDisparityColor, cv::COLORMAP_JET);
-
-	// Done handling output, don't forget to unlock it.
-	CHECK_STATUS(vpiImageUnlock(disparity));
-
-	cv::imshow("depth", cvDisparity);
-	cv::waitKey(0);
-	cv::imshow("color", cvDisparityColor);
-	cv::waitKey(0);
-
-
-
-	// ========
-	// Clean up
-
-	// Destroying stream first makes sure that all work submitted to
-	// it is finished.
-	vpiStreamDestroy(stream);
-
-	// Only then we can destroy the other objects, as we're sure they
-	// aren't being used anymore.
-
-	vpiImageDestroy(inLeft);
-	vpiImageDestroy(inRight);
-	vpiImageDestroy(tmpLeft);
-	vpiImageDestroy(tmpRight);
-	vpiImageDestroy(stereoLeft);
-	vpiImageDestroy(stereoRight);
-	vpiImageDestroy(confidenceMap);
-	vpiImageDestroy(disparity);
-	vpiPayloadDestroy(stereo);
+	// cv::Mat show;
+	// cv::cvtColor(disparity_8u, disparity_8u, cv::COLOR_GRAY2BGR);
+	// cv::hconcat(disparity_8u, disparity_color, show);
+	// cv::imshow("show", show);
+	// cv::waitKey(0);
 }
+
+cv::Mat cv_gpu(cv::Mat &img1, cv::Mat &img2, int disp_size, int p1, int p2) {
+	cv::cuda::GpuMat d_img1, d_img2; // 在GPU上的输入图像
+	cv::cuda::GpuMat d_disp;		 // 在GPU上的视差图
+
+	// 将输入图像上传到GPU
+	d_img1.upload(img1);
+	d_img2.upload(img2);
+
+	cv::Mat						 disparity;
+	int							 block_size	 = 3;
+	int							 P1			 = 10;
+	int							 P2			 = 120;
+	float						 uniqueness	 = 0.95;
+	int							 num_paths	 = 8;
+	int							 min_disp	 = 0;
+	int							 LR_max_diff = 1;
+	cv::Ptr<cv::cuda::StereoSGM> sgbm		 = cv::cuda::createStereoSGM();
+	sgbm->setDisp12MaxDiff(2);
+	sgbm->setNumDisparities(disp_size);
+	sgbm->setP1(20);
+	sgbm->setP2(300);
+	sgbm->compute(d_img1, d_img2, d_disp);
+	d_disp.download(disparity);
+	cv::Mat disparity_8u, disparity_color;
+	disparity.convertTo(disparity_8u, CV_8U, 255.0 / disp_size, 0);
+	cv::applyColorMap(disparity_8u, disparity_color, cv::COLORMAP_TURBO);
+	return disparity_color;
+}
+
 
 void TEST_vpi_depth_main() {
 	vpi::DepthEstimator depth_estimator;
@@ -375,122 +280,53 @@ void TEST_vpi_depth_main() {
 	// cv::imshow("show", show);
 	// cv::waitKey(0);
 }
+// 深度128  都在16ms左右
+// 深度256 SGM 25ms  VPI 17ms
 
-cv::Mat draw_keypoints(cv::Mat &img, std::vector<VPIKeypointF32> &keypoints, std::vector<uint32_t> score) {
-	cv::Mat img_keypoints;
-	cv::cvtColor(img, img_keypoints, cv::COLOR_GRAY2BGR);
-	for (size_t i = 0; i < keypoints.size(); i++) {
-		cv::circle(img_keypoints, cv::Point(keypoints[i].x, keypoints[i].y), 2, cv::Scalar(0, 0, 255), -1);
-		cv::putText(img_keypoints, std::to_string(score[i]), cv::Point(keypoints[i].x, keypoints[i].y),
-					cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 1);
-	}
-	return img_keypoints;
-}
-
-void vpi_harris() {
-	cv::Mat cv_left_img, cv_right_img;
-	cv_left_img	 = cv::imread("/swarm/fisheye_ws/output/img_left1.png", cv::IMREAD_GRAYSCALE);
-	cv_right_img = cv::imread("/swarm/fisheye_ws/output/img_right1.png", cv::IMREAD_GRAYSCALE);
-	int width	 = cv_left_img.cols;
-	int height	 = cv_left_img.rows;
-
-	VPIStream					  stream;
-	VPIImage					  vpi_left_img;
-	VPIArray					  pts, score;
-	VPIPayload					  harris;
-	VPIHarrisCornerDetectorParams harrisParams;
-	CHECK_STATUS(vpiStreamCreate(0, &stream));
-	CHECK_STATUS(vpiImageCreateWrapperOpenCVMat(cv_left_img, 0, &vpi_left_img));
-	CHECK_STATUS(vpiArrayCreate(8192, VPI_ARRAY_TYPE_KEYPOINT_F32, 0, &pts));
-	CHECK_STATUS(vpiArrayCreate(8192, VPI_ARRAY_TYPE_U32, 0, &score));
-	CHECK_STATUS(vpiCreateHarrisCornerDetector(VPI_BACKEND_CUDA, width, height, &harris));
-	CHECK_STATUS(vpiInitHarrisCornerDetectorParams(&harrisParams));
-	harrisParams.gradientSize	= 3;
-	harrisParams.blockSize		= 5;
-	harrisParams.strengthThresh = 20;
-	harrisParams.sensitivity	= 0.001;
-	harrisParams.minNMSDistance = 30;
-	TicToc t_harris;
-	CHECK_STATUS(
-		vpiSubmitHarrisCornerDetector(stream, VPI_BACKEND_CUDA, harris, vpi_left_img, pts, score, &harrisParams));
-	CHECK_STATUS(vpiStreamSync(stream));
-
-	VPIArrayData ptsDataWrapper, scoreDataWrapper;
-	CHECK_STATUS(vpiArrayLockData(pts, VPI_LOCK_READ_WRITE, VPI_ARRAY_BUFFER_HOST_AOS, &ptsDataWrapper));
-	CHECK_STATUS(vpiArrayLockData(score, VPI_LOCK_READ_WRITE, VPI_ARRAY_BUFFER_HOST_AOS, &scoreDataWrapper));
-
-
-	VPIArrayBufferAOS &pts_data	  = ptsDataWrapper.buffer.aos;
-	VPIArrayBufferAOS &score_data = scoreDataWrapper.buffer.aos;
-
-	VPIKeypointF32 *kptData = reinterpret_cast<VPIKeypointF32 *>(pts_data.data);
-	uint32_t	   *pscore	= reinterpret_cast<uint32_t *>(score_data.data);
-
-	std::vector<int> indices(*pts_data.sizePointer);
-	std::iota(indices.begin(), indices.end(), 0);
-
-	stable_sort(indices.begin(), indices.end(), [&score_data](int a, int b) {
-		uint32_t *score = reinterpret_cast<uint32_t *>(score_data.data);
-		return score[a] >= score[b]; // decreasing score order
-	});
-
-	// keep the only 'max' indexes.
-	indices.resize(std::min<size_t>(indices.size(), 100));
-
-
-
-	// reorder the keypoints to keep the first 'max' with highest scores.
-	std::vector<VPIKeypointF32> kpt;
-	kpt.reserve(indices.size());
-	for (auto idx : indices)
-		kpt.push_back(kptData[idx]);
-	// std::transform(indices.begin(), indices.end(), std::back_inserter(kpt),
-	// 			   [kptData](int idx) { return kptData[idx]; });
-	std::copy(kpt.begin(), kpt.end(), kptData);
-
-	*pts_data.sizePointer = kpt.size();
-
-	std::vector<uint32_t> score_vec;
-	score_vec.reserve(indices.size());
-	for (auto idx : indices)
-		score_vec.push_back(pscore[idx]);
-	std::copy(score_vec.begin(), score_vec.end(), pscore);
-
-	*score_data.sizePointer = score_vec.size();
-
-	CHECK_STATUS(vpiArrayUnlock(pts));
-	CHECK_STATUS(vpiArrayUnlock(score));
-
-	ROS_INFO_STREAM("harris time:" << t_harris.toc());
-
-
-	vpiStreamDestroy(stream);
-	vpiImageDestroy(vpi_left_img);
-	vpiArrayDestroy(pts);
-	vpiArrayDestroy(score);
-	vpiPayloadDestroy(harris);
-}
 
 int main(int argc, char **argv) {
+	TEST_vpi_depth_main();
+	// cv::Mat cv_left_img, cv_right_img;
+	// cv_left_img	 = cv::imread("/swarm/fisheye_ws/output/img_left1.png", cv::IMREAD_GRAYSCALE);
+	// cv_right_img = cv::imread("/swarm/fisheye_ws/output/img_right1.png", cv::IMREAD_GRAYSCALE);
+	// // cv_gpu(cv_left_img, cv_right_img, 128);
+	// cv::Mat show = cv_gpu(cv_left_img, cv_right_img, 128, 10, 120);
+	// cv::imshow("show", show);
+	// cv::waitKey(0);
+	// int init_num = 3;
+	// int perf_num = 100;
 
-	cv::Mat cv_left_img, cv_right_img;
-	cv_left_img	 = cv::imread("/swarm/fisheye_ws/output/img_left1.png", cv::IMREAD_GRAYSCALE);
-	cv_right_img = cv::imread("/swarm/fisheye_ws/output/img_right1.png", cv::IMREAD_GRAYSCALE);
-	cv::cuda::GpuMat				   img		= cv::cuda::GpuMat(cv_left_img);
-	cv::Ptr<cv::cuda::CornersDetector> detector = cv::cuda::createGoodFeaturesToTrackDetector(img.type(), 100, 0.3, 10);
-	cv::cuda::GpuMat				   d_prevPts;
-	detector->detect(img, d_prevPts);
+	// TicToc t_sgm1;
+	// for (int i = 0; i < init_num; i++) {
+	// 	lib_sgm(cv_left_img, cv_right_img, 256);
+	// }
+	// double t_sgm1_sum = t_sgm1.toc();
+	// TicToc t_sgm2;
+	// for (int i = 0; i < perf_num; i++) {
+	// 	lib_sgm(cv_left_img, cv_right_img, 256);
+	// }
+	// double t_sgm2_sum = t_sgm2.toc();
 
+	// TicToc t_vpi1;
+	// for (int i = 0; i < init_num; i++) {
+	// 	depth1(cv_left_img, cv_right_img, 256, 0.1);
+	// }
+	// double t_vpi1_sum = t_vpi1.toc();
+	// TicToc t_vpi2;
+	// for (int i = 0; i < perf_num; i++) {
+	// 	depth1(cv_left_img, cv_right_img, 256, 0.1);
+	// }
+	// double t_vpi2_sum = t_vpi2.toc();
 
-	cv::Mat show;
-	cv::cvtColor(cv_left_img, show, cv::COLOR_GRAY2BGR);
+	// ROS_INFO_STREAM("sgm init time:" << t_sgm1_sum / init_num);
+	// ROS_INFO_STREAM("sgm time:" << t_sgm2_sum / perf_num);
+	// ROS_INFO_STREAM("vpi init time:" << t_vpi1_sum / init_num);
+	// ROS_INFO_STREAM("vpi time:" << t_vpi2_sum / perf_num);
 
-	std::vector<cv::Point2f> prevPts = cv::Mat_<cv::Point2f>(cv::Mat(d_prevPts));
-	ROS_INFO_STREAM("detect size:" << prevPts.size());
-	for (int i = 0; i < d_prevPts.cols; i++) {
-		cv::circle(show, prevPts[i], 2, cv::Scalar(0, 0, 255), -1);
-	}
-	cv::namedWindow("show", cv::WINDOW_NORMAL);
-	cv::imshow("show", show);
-	cv::waitKey(0);
+	// cv::Mat disparity_color	 = lib_sgm(cv_left_img, cv_right_img, 256);
+	// cv::Mat disparity_color2 = depth1(cv_left_img, cv_right_img, 256, 0.1);
+	// cv::Mat show;
+	// cv::hconcat(disparity_color, disparity_color2, show);
+	// cv::imshow("disparity_color", show);
+	// cv::waitKey(0);
 }

@@ -22,7 +22,6 @@ int main(int argc, char **argv) {
 	ros::NodeHandle n("~");
 	ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
 
-
 	VinsNode fisheye(n);
 
 	ros::MultiThreadedSpinner spinner(3);

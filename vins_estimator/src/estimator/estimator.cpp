@@ -10,7 +10,7 @@
 #include "estimator.h"
 #include "utility/visualization.h"
 #include "featureTracker/feature_tracker_pinhole.hpp"
-#include "featureTracker/feature_tracker_vpi.hpp"
+#include "featureTracker/feature_tracker_cuda_async.hpp"
 
 Estimator::Estimator() : f_manager{Rs} {
 	ROS_INFO("init begins");
@@ -30,7 +30,7 @@ void Estimator::setParameter() {
 
 	if (USE_GPU) {
 		// featureTracker = new FeatureTracker::PinholeFeatureTrackerCuda(this);
-		featureTracker = new FeatureTracker::FeatureTrackerVPI(this);
+		featureTracker = new FeatureTracker::PinholeFeatureTrackerAsync(this);
 	} else {
 		featureTracker = new FeatureTracker::PinholeFeatureTrackerCPU(this);
 	}
@@ -232,7 +232,7 @@ void Estimator::processMeasurements() {
 				double dt = t_process.toc();
 				mea_sum_time += dt;
 				mea_track_count++;
-				ROS_INFO("process measurement time: AVG %f NOW %f\n", mea_sum_time / mea_track_count, dt);
+				ROS_INFO("[backend] process measurement time: AVG %f NOW %f\n", mea_sum_time / mea_track_count, dt);
 				ROS_INFO("feature buf size:%d", int(featureBuf.size()));
 				// avg cost 5 ms
 			}
