@@ -49,20 +49,6 @@ class PinholeFeatureTracker : public BaseFeatureTracker {
 
 
 
-class PinholeFeatureTrackerCuda : public PinholeFeatureTracker<cv::cuda::GpuMat> {
-  protected:
-	cv::cuda::GpuMat prev_gpu_img;
-	cv::Mat			 cur_img, rightImg;
-
-  public:
-	PinholeFeatureTrackerCuda(Estimator *_estimator) : PinholeFeatureTracker<cv::cuda::GpuMat>(_estimator) {
-	}
-	virtual FeatureFrame trackImage(double _cur_time, cv::InputArray _img,
-									cv::InputArray _img1 = cv::noArray()) override;
-};
-
-
-
 class PinholeFeatureTrackerCPU : public PinholeFeatureTracker<cv::Mat> {
   public:
 	PinholeFeatureTrackerCPU(Estimator *_estimator) : PinholeFeatureTracker<cv::Mat>(_estimator) {

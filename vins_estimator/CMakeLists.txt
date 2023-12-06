@@ -163,8 +163,7 @@ catkin_package()
 
 add_library(vins_frontend SHARED
     src/featureTracker/feature_tracker_base.cpp
-    src/featureTracker/feature_tracker_pinhole.cpp
-    src/featureTracker/feature_tracker_cuda_async.cpp
+    src/featureTracker/feature_tracker_cpu.cpp
 )
 
 

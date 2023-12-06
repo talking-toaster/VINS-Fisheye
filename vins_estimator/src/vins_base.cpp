@@ -92,6 +92,7 @@ void VinsNodeBaseClass::Init(ros::NodeHandle &n) {
 	depth_estimator_thread = std::thread([&]() {
 		while (1) {
 			std::pair<cv::Mat, cv::Mat> stero_pair;
+			ros::Rate					r(10);
 			if (stero_buf.try_pop(stero_pair)) {
 				while (stero_buf.try_pop(stero_pair))
 					;
@@ -100,6 +101,7 @@ void VinsNodeBaseClass::Init(ros::NodeHandle &n) {
 				ROS_INFO_STREAM("depth used: " << t_depth.toc() << " ms.");
 				cv::imshow("depth", depth_estimator.depth_img);
 				cv::waitKey(1);
+				r.sleep();
 			}
 		}
 	});

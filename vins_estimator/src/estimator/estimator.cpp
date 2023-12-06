@@ -9,7 +9,8 @@
 
 #include "estimator.h"
 #include "utility/visualization.h"
-#include "featureTracker/feature_tracker_pinhole.hpp"
+#include "featureTracker/feature_tracker_cpu.hpp"
+#include "featureTracker/feature_tracker_cuda.hpp"
 #include "featureTracker/feature_tracker_cuda_async.hpp"
 
 Estimator::Estimator() : f_manager{Rs} {
