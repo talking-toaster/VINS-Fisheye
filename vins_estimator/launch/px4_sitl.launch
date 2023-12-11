@@ -1,0 +1,10 @@
+<launch>
+    <arg name="output" default="screen" />
+    <arg name="viz"     default="false"/>
+    <arg name="config_file" default="$(find vins)/../config/px4_sitl_d455/px4_sitl_d455.yaml" />
+
+    <node pkg="vins" type="vins_node" name="vins_estimator"  output="$(arg output)">
+        <param name="config_file" type="string" value="$(arg config_file)"/>
+    </node>
+    <include file="$(find vins)/launch/vins_rviz.launch" if="$(arg viz)" />
+</launch>
