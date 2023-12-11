@@ -91,12 +91,12 @@ class PinholeFeatureTrackerCuda : public PinholeFeatureTracker<cv::cuda::GpuMat>
 
 		double t_front_end = t_trackImage.toc();
 		front_end_sum += t_front_end;
-		ROS_INFO("[frontend] Img: %d: trackImage ALL: %3.1fms; PT NUM: %ld, STEREO: %ld; Avg: %3.1fms COPY_TO_GPU: "
+		ROS_INFO("%s[frontend]Img: %d: trackImage ALL: %3.1fms; PT NUM: %ld, STEREO: %ld; Avg: %3.1fms COPY_TO_GPU: "
 				 "%3.1fms GFTT "
-				 "%3.1fms LKFlow %3.1fms SHOW %3.1fms in GPU\n",
-				 count, t_front_end, cur_pts.size(), cur_right_pts.size(), front_end_sum / count,
+				 "%3.1fms LKFlow %3.1fms SHOW %3.1fms in GPU%s%s \n",
+				 BLUE, count, t_front_end, cur_pts.size(), cur_right_pts.size(), front_end_sum / count,
 				 copy_to_gpu_sum / count, detected_time_sum / count, flow_track_time_sum / count,
-				 show_track_sum / count);
+				 show_track_sum / count, BLUE, C_RESET);
 		return featureFrame;
 #endif
 	}

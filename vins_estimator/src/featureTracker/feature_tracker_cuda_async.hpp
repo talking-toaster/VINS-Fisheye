@@ -145,12 +145,12 @@ class PinholeFeatureTrackerAsync : public PinholeFeatureTracker<cv::cuda::GpuMat
 												right_pts_velocity, 1);
 		double t_front_end = t_trackImage.toc();
 		front_end_sum += t_front_end;
-		ROS_INFO(
-			"[frontend] Img: %d: trackImage ALL: %3.1fms; PT NUM: %ld, STEREO: %ld; Avg: %3.1fms COPY_TO_GPU: %3.1fms "
-			"GFTT submit %3.1fms end %3.1fms LKFlow %3.1fms SHOW %3.1fms in GPU\n",
-			count, t_front_end, cur_pts.size(), cur_right_pts.size(), front_end_sum / count, copy_to_gpu_sum / count,
-			detected_time_submit_sum / count, detected_time_end_sum / count, flow_track_time_sum / count,
-			show_track_sum / count);
+		ROS_INFO("%s[frontend]Img: %d: trackImage ALL: %3.1fms; PT NUM: %ld, STEREO: %ld; Avg: %3.1fms "
+				 "COPY_TO_GPU: %3.1fms "
+				 "GFTT submit %3.1fms end %3.1fms LKFlow %3.1fms SHOW %3.1fms in GPU%s%s \n",
+				 BLUE, count, t_front_end, cur_pts.size(), cur_right_pts.size(), front_end_sum / count,
+				 copy_to_gpu_sum / count, detected_time_submit_sum / count, detected_time_end_sum / count,
+				 flow_track_time_sum / count, show_track_sum / count, BLUE, C_RESET);
 		return featureFrame;
 #endif
 	}

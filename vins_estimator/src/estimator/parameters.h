@@ -86,3 +86,13 @@ enum SIZE_PARAMETERIZATION { SIZE_POSE = 7, SIZE_SPEEDBIAS = 9, SIZE_FEATURE = 1
 enum StateOrder { O_P = 0, O_R = 3, O_V = 6, O_BA = 9, O_BG = 12 };
 
 enum NoiseOrder { O_AN = 0, O_GN = 3, O_AW = 6, O_GW = 9 };
+
+// ANSI颜色码
+#define C_RESET "\033[0m"  /*color reset */
+#define RED		"\033[31m" /* Red */
+#define GREEN	"\033[32m" /* Green */
+#define YELLOW	"\033[33m" /* Yellow */
+#define BLUE	"\033[34m" /* Blue */
+#define MAGENTA "\033[35m" /* Magenta */
+#define CYAN	"\033[36m" /* Cyan */
+#define WHITE	"\033[37m" /* White */

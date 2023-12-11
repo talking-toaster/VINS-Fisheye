@@ -233,9 +233,10 @@ void Estimator::processMeasurements() {
 				double dt = t_process.toc();
 				mea_sum_time += dt;
 				mea_track_count++;
-				ROS_INFO("[backend] process measurement time: AVG %f NOW %f\n", mea_sum_time / mea_track_count, dt);
-				ROS_INFO("feature buf size:%d", int(featureBuf.size()));
-				// avg cost 5 ms
+				ROS_INFO("%s[backend]process measurement time: AVG %f NOW %f%s %s \n", GREEN,
+						 mea_sum_time / mea_track_count, dt, GREEN, C_RESET);
+				// ROS_INFO("feature buf size:%d", int(featureBuf.size()));
+				//  avg cost 5 ms
 			}
 
 
