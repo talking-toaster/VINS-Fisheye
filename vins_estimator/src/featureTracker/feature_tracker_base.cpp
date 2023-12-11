@@ -429,10 +429,6 @@ void BaseFeatureTracker::drawTrackImage(cv::Mat &img, vector<cv::Point2f> pts, v
 		}
 
 		cv::circle(img, pts[j], 1, color, 2);
-		if (SHOW_FEATURE_ID) {
-			sprintf(idtext, "%d", ids[j]);
-			cv::putText(img, idtext, pts[j] - cv::Point2f(5, 0), cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 1);
-		}
 	}
 
 	// for (auto it : predictions) {

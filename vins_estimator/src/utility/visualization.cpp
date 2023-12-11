@@ -22,8 +22,6 @@ ros::Publisher pub_point_cloud, pub_margin_cloud;
 ros::Publisher pub_key_poses;
 ros::Publisher pub_camera_pose;
 ros::Publisher pub_camera_pose_right;
-ros::Publisher pub_rectify_pose_left;
-ros::Publisher pub_rectify_pose_right;
 ros::Publisher pub_camera_pose_visual;
 nav_msgs::Path path;
 ros::Publisher pub_flatten_images;
@@ -47,8 +45,6 @@ void registerPub(ros::NodeHandle &n) {
 	pub_key_poses		   = n.advertise<visualization_msgs::Marker>("key_poses", 1000);
 	pub_camera_pose		   = n.advertise<geometry_msgs::PoseStamped>("camera_pose", 1000);
 	pub_camera_pose_right  = n.advertise<geometry_msgs::PoseStamped>("camera_pose_right", 1000);
-	pub_rectify_pose_left  = n.advertise<geometry_msgs::PoseStamped>("rectify_pose_left", 1000);
-	pub_rectify_pose_right = n.advertise<geometry_msgs::PoseStamped>("rectify_pose_right", 1000);
 	pub_camera_pose_visual = n.advertise<visualization_msgs::MarkerArray>("camera_pose_visual", 1000);
 	pub_keyframe_pose	   = n.advertise<nav_msgs::Odometry>("keyframe_pose", 1000);
 	pub_keyframe_point	   = n.advertise<sensor_msgs::PointCloud>("keyframe_point", 1000);
@@ -316,35 +312,6 @@ void pubCameraPose(const Estimator &estimator, const std_msgs::Header &header) {
 			odometry_r.pose.orientation.z = R_r.z();
 			odometry_r.pose.orientation.w = R_r.w();
 			pub_camera_pose_right.publish(odometry_r);
-			if (PUB_RECTIFY) {
-				Vector3d	R_P_l = P;
-				Vector3d	R_P_r = P_r;
-				Quaterniond R_R_l = Quaterniond(estimator.Rs[i] * estimator.ric[0] * rectify_R_left.inverse());
-				Quaterniond R_R_r = Quaterniond(estimator.Rs[i] * estimator.ric[1] * rectify_R_right.inverse());
-				geometry_msgs::PoseStamped R_pose_l, R_pose_r;
-				R_pose_l.header				= header;
-				R_pose_r.header				= header;
-				R_pose_l.header.frame_id	= "world";
-				R_pose_r.header.frame_id	= "world";
-				R_pose_l.pose.position.x	= R_P_l.x();
-				R_pose_l.pose.position.y	= R_P_l.y();
-				R_pose_l.pose.position.z	= R_P_l.z();
-				R_pose_l.pose.orientation.x = R_R_l.x();
-				R_pose_l.pose.orientation.y = R_R_l.y();
-				R_pose_l.pose.orientation.z = R_R_l.z();
-				R_pose_l.pose.orientation.w = R_R_l.w();
-
-				R_pose_r.pose.position.x	= R_P_r.x();
-				R_pose_r.pose.position.y	= R_P_r.y();
-				R_pose_r.pose.position.z	= R_P_r.z();
-				R_pose_r.pose.orientation.x = R_R_r.x();
-				R_pose_r.pose.orientation.y = R_R_r.y();
-				R_pose_r.pose.orientation.z = R_R_r.z();
-				R_pose_r.pose.orientation.w = R_R_r.w();
-
-				pub_rectify_pose_left.publish(R_pose_l);
-				pub_rectify_pose_right.publish(R_pose_r);
-			}
 		}
 
 		pub_camera_pose.publish(odometry);

@@ -37,7 +37,6 @@ std::string VINS_RESULT_PATH;
 std::string OUTPUT_FOLDER;
 std::string IMU_TOPIC;
 int			HEIGHT, WIDTH;
-int			SHOW_WIDTH;
 double		TD;
 int			NUM_OF_CAM;
 int			STEREO;
@@ -48,126 +47,95 @@ double depth_estimate_baseline;
 int						  USE_IMU;
 int						  USE_GPU;
 int						  USE_NVIDIA_VPI;
-int						  PUB_RECTIFY;
 int						  USE_ORB;
-Eigen::Matrix3d			  rectify_R_left;
-Eigen::Matrix3d			  rectify_R_right;
 map<int, Eigen::Vector3d> pts_gt;
 std::string				  IMAGE0_TOPIC, IMAGE1_TOPIC;
-std::string				  COMP_IMAGE0_TOPIC, COMP_IMAGE1_TOPIC;
 std::string				  FISHEYE_MASK;
 std::vector<std::string>  CAM_NAMES;
-std::string				  depth_config;
 int						  MAX_CNT;
-int						  TOP_PTS_CNT;
-int						  SIDE_PTS_CNT;
 int						  MAX_SOLVE_CNT;
-int						  RGB_DEPTH_CLOUD;
 int						  ENABLE_DEPTH;
 int						  ENABLE_PERF_OUTPUT;
 int						  MIN_DIST;
 double					  F_THRESHOLD;
 int						  SHOW_TRACK;
 int						  FLOW_BACK;
-int						  SHOW_FEATURE_ID;
 
 int WARN_IMU_DURATION;
-int PUB_FLATTEN;
-int FLATTEN_COLOR;
-int PUB_FLATTEN_FREQ;
 
 std::string configPath;
 
+cv::FileStorage config;
+
 template <typename T>
-T readParam(ros::NodeHandle &n, std::string name) {
-	T ans;
-	if (n.getParam(name, ans)) {
-		ROS_INFO_STREAM("Loaded " << name << ": " << ans);
-	} else {
-		ROS_ERROR_STREAM("Failed to load " << name);
-		n.shutdown();
+T readParam(std::string name) {
+	T			 ans;
+	cv::FileNode n = config[name];
+	if (n.empty()) {
+		ROS_ERROR_STREAM("Failed to find " << name << " in config file.");
+		exit(-1);
 	}
+	n >> ans;
 	return ans;
 }
 
 void readParameters(std::string config_file) {
-	/*
-	FILE *fh = fopen(config_file.c_str(),"r");
-	if(fh == NULL){
-		ROS_WARN("config_file dosen't exist; wrong config_file path");
-		ROS_BREAK();
-		return;
-	}
-	fclose(fh);*/
-
-	cv::FileStorage fsSettings;
 	try {
-		fsSettings.open(config_file.c_str(), cv::FileStorage::READ);
+		config.open(config_file.c_str(), cv::FileStorage::READ);
 	} catch (cv::Exception &ex) {
 		std::cerr << "ERROR:" << ex.what() << " Can't open config file" << std::endl;
 	}
-	if (!fsSettings.isOpened()) {
+	if (!config.isOpened()) {
 		std::cerr << "ERROR: Wrong path to settings" << std::endl;
 	}
 
-	fsSettings["image0_topic"] >> IMAGE0_TOPIC;
-	fsSettings["image1_topic"] >> IMAGE1_TOPIC;
+	IMAGE0_TOPIC = readParam<std::string>("image0_topic");
+	IMAGE1_TOPIC = readParam<std::string>("image1_topic");
 
-	fsSettings["compressed_image0_topic"] >> COMP_IMAGE0_TOPIC;
-	fsSettings["compressed_image1_topic"] >> COMP_IMAGE1_TOPIC;
-	MAX_CNT		  = fsSettings["max_cnt"];
-	TOP_PTS_CNT	  = fsSettings["top_cnt"];
-	SIDE_PTS_CNT  = fsSettings["side_cnt"];
-	MAX_SOLVE_CNT = fsSettings["max_solve_cnt"];
-	MIN_DIST	  = fsSettings["min_dist"];
-	USE_ORB		  = fsSettings["use_orb"];
+	MAX_CNT		  = readParam<int>("max_cnt");
+	MAX_SOLVE_CNT = readParam<int>("max_solve_cnt");
+	MIN_DIST	  = readParam<int>("min_dist");
+	USE_ORB		  = readParam<int>("use_orb");
 
-	SHOW_TRACK			= fsSettings["show_track"];
-	SHOW_FEATURE_ID		= fsSettings["show_track_id"];
-	FLOW_BACK			= fsSettings["flow_back"];
-	RGB_DEPTH_CLOUD		= fsSettings["rgb_depth_cloud"];
-	ENABLE_DEPTH		= fsSettings["enable_depth"];
-	THRES_OUTLIER		= fsSettings["thres_outlier"];
-	triangulate_max_err = fsSettings["tri_max_err"];
-	USE_GPU				= fsSettings["use_gpu"];
-	USE_NVIDIA_VPI		= fsSettings["use_nvidia_vpi"];
+	SHOW_TRACK			= readParam<int>("show_track");
+	FLOW_BACK			= readParam<int>("flow_back");
+	ENABLE_DEPTH		= readParam<int>("enable_depth");
+	THRES_OUTLIER		= readParam<double>("thres_outlier");
+	triangulate_max_err = readParam<double>("tri_max_err");
+	USE_GPU				= readParam<int>("use_gpu");
+	USE_NVIDIA_VPI		= readParam<int>("use_nvidia_vpi");
+
 #ifdef WITHOUT_CUDA
 	if (USE_GPU) {
 		std::cerr << "Compile with WITHOUT_CUDA mode, use_gpu is not supported!!!" << std::endl;
 		exit(-1);
 	}
 #endif
-	depth_estimate_baseline = fsSettings["depth_estimate_baseline"];
-	ENABLE_PERF_OUTPUT		= fsSettings["enable_perf_output"];
+	depth_estimate_baseline = readParam<double>("depth_estimate_baseline");
+	ENABLE_PERF_OUTPUT		= readParam<int>("enable_perf_output");
 
-	IMU_FREQ		  = fsSettings["imu_freq"];
-	IMAGE_FREQ		  = fsSettings["image_freq"];
-	WARN_IMU_DURATION = fsSettings["warn_imu_duration"];
-	PUB_FLATTEN		  = fsSettings["pub_flatten"];
-	FLATTEN_COLOR	  = fsSettings["flatten_color"];
-	USE_IMU			  = fsSettings["imu"];
-	PUB_FLATTEN_FREQ  = fsSettings["pub_flatten_freq"];
-	if (PUB_FLATTEN_FREQ == 0) {
-		PUB_FLATTEN_FREQ = 10;
-	}
+	IMU_FREQ		  = readParam<double>("imu_freq");
+	IMAGE_FREQ		  = readParam<double>("image_freq");
+	WARN_IMU_DURATION = readParam<int>("warn_imu_duration");
+	USE_IMU			  = readParam<int>("imu");
 
 	printf("USE_IMU: %d\n", USE_IMU);
 	if (USE_IMU) {
-		fsSettings["imu_topic"] >> IMU_TOPIC;
+		IMU_TOPIC = readParam<std::string>("imu_topic");
 		printf("IMU_TOPIC: %s\n", IMU_TOPIC.c_str());
-		ACC_N = fsSettings["acc_n"];
-		ACC_W = fsSettings["acc_w"];
-		GYR_N = fsSettings["gyr_n"];
-		GYR_W = fsSettings["gyr_w"];
-		G.z() = fsSettings["g_norm"];
+		ACC_N = readParam<double>("acc_n");
+		ACC_W = readParam<double>("acc_w");
+		GYR_N = readParam<double>("gyr_n");
+		GYR_W = readParam<double>("gyr_w");
+		G.z() = readParam<double>("g_norm");
 	}
 
-	SOLVER_TIME	   = fsSettings["max_solver_time"];
-	NUM_ITERATIONS = fsSettings["max_num_iterations"];
-	MIN_PARALLAX   = fsSettings["keyframe_parallax"];
+	SOLVER_TIME	   = readParam<double>("max_solver_time");
+	NUM_ITERATIONS = readParam<int>("max_num_iterations");
+	MIN_PARALLAX   = readParam<double>("keyframe_parallax");
 	MIN_PARALLAX   = MIN_PARALLAX / FOCAL_LENGTH;
 
-	fsSettings["output_path"] >> OUTPUT_FOLDER;
+	OUTPUT_FOLDER	 = readParam<std::string>("output_path");
 	VINS_RESULT_PATH = OUTPUT_FOLDER + "/vio.csv";
 	std::cout << "result path " << VINS_RESULT_PATH << std::endl;
 	std::ofstream fout(VINS_RESULT_PATH, std::ios::out);
@@ -176,7 +144,7 @@ void readParameters(std::string config_file) {
 	RIC.resize(2);
 	TIC.resize(2);
 
-	ESTIMATE_EXTRINSIC = fsSettings["estimate_extrinsic"];
+	ESTIMATE_EXTRINSIC = readParam<int>("estimate_extrinsic");
 	if (ESTIMATE_EXTRINSIC == 2) {
 		ROS_WARN("have no prior about extrinsic param, calibrate extrinsic param");
 		RIC[0]				 = Eigen::Matrix3d::Identity();
@@ -191,15 +159,13 @@ void readParameters(std::string config_file) {
 		if (ESTIMATE_EXTRINSIC == 0)
 			ROS_WARN(" fix extrinsic param ");
 
-		cv::Mat cv_T;
-		fsSettings["body_T_cam0"] >> cv_T;
+		cv::Mat			cv_T = readParam<cv::Mat>("body_T_cam0");
 		Eigen::Matrix4d T;
 		cv::cv2eigen(cv_T, T);
 		RIC[0] = T.block<3, 3>(0, 0);
 		TIC[0] = T.block<3, 1>(0, 3);
 	}
-
-	NUM_OF_CAM = fsSettings["num_of_cam"];
+	NUM_OF_CAM = readParam<int>("num_of_cam");
 	printf("camera number %d\n", NUM_OF_CAM);
 
 	if (NUM_OF_CAM != 1 && NUM_OF_CAM != 2) {
@@ -212,55 +178,38 @@ void readParameters(std::string config_file) {
 	configPath = config_file.substr(0, pn);
 
 
-	depth_config = configPath + "/" + ((std::string)fsSettings["depth_config"]);
-
-	std::string cam0Calib;
-	fsSettings["cam0_calib"] >> cam0Calib;
-	std::string cam0Path = configPath + "/" + cam0Calib;
+	std::string cam0Calib = readParam<std::string>("cam0_calib");
+	std::string cam0Path  = configPath + "/" + cam0Calib;
 	CAM_NAMES.resize(2);
 
 	CAM_NAMES[0] = cam0Path;
 
 	if (NUM_OF_CAM == 2) {
-		STEREO = 1;
-		std::string cam1Calib;
-		fsSettings["cam1_calib"] >> cam1Calib;
-		std::string cam1Path = configPath + "/" + cam1Calib;
+		STEREO				  = 1;
+		std::string cam1Calib = readParam<std::string>("cam1_calib");
+		std::string cam1Path  = configPath + "/" + cam1Calib;
 
 		CAM_NAMES[1] = cam1Path;
 
-		cv::Mat cv_T;
-		fsSettings["body_T_cam1"] >> cv_T;
+		cv::Mat			cv_T = readParam<cv::Mat>("body_T_cam1");
 		Eigen::Matrix4d T;
 		cv::cv2eigen(cv_T, T);
 		RIC[1] = T.block<3, 3>(0, 0);
 		TIC[1] = T.block<3, 1>(0, 3);
-		fsSettings["publish_rectify"] >> PUB_RECTIFY;
 	}
 
 	INIT_DEPTH		   = 5.0;
 	BIAS_ACC_THRESHOLD = 0.1;
 	BIAS_GYR_THRESHOLD = 0.1;
 
-	TD			= fsSettings["td"];
-	ESTIMATE_TD = fsSettings["estimate_td"];
+	TD			= readParam<double>("td");
+	ESTIMATE_TD = readParam<int>("estimate_td");
 	if (ESTIMATE_TD)
 		ROS_INFO_STREAM("Unsynchronized sensors, online estimate time offset, initial td: " << TD);
 	else
 		ROS_INFO_STREAM("Synchronized sensors, fix time offset: " << TD);
 
-	HEIGHT	   = fsSettings["image_height"];
-	WIDTH	   = fsSettings["image_width"];
-	SHOW_WIDTH = fsSettings["show_width"];
-
-	if (PUB_RECTIFY) {
-		cv::Mat rectify_left;
-		cv::Mat rectify_right;
-		fsSettings["cam0_rectify"] >> rectify_left;
-		fsSettings["cam1_rectify"] >> rectify_right;
-		cv::cv2eigen(rectify_left, rectify_R_left);
-		cv::cv2eigen(rectify_right, rectify_R_right);
-	}
-
-	fsSettings.release();
+	HEIGHT = readParam<int>("image_height");
+	WIDTH  = readParam<int>("image_width");
+	config.release();
 }
