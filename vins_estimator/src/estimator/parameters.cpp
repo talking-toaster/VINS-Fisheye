@@ -60,11 +60,12 @@ int						  MIN_DIST;
 double					  F_THRESHOLD;
 int						  SHOW_TRACK;
 int						  FLOW_BACK;
+int						  WARN_IMU_DURATION;
 
-int WARN_IMU_DURATION;
+std::string MAG_TOPIC;
+bool		USE_MAG;
 
-std::string configPath;
-
+std::string		configPath;
 cv::FileStorage config;
 
 template <typename T>
@@ -88,6 +89,9 @@ void readParameters(std::string config_file) {
 	if (!config.isOpened()) {
 		std::cerr << "ERROR: Wrong path to settings" << std::endl;
 	}
+	USE_MAG = readParam<bool>("use_mag");
+	if (USE_MAG)
+		MAG_TOPIC = readParam<std::string>("mag_topic");
 
 	IMAGE0_TOPIC = readParam<std::string>("image0_topic");
 	IMAGE1_TOPIC = readParam<std::string>("image1_topic");

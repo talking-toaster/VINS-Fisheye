@@ -99,10 +99,10 @@ void printStatistics(const Estimator &estimator, double timestamp) {
 	if (ENABLE_PERF_OUTPUT) {
 		sum_of_path += (estimator.Ps[WINDOW_SIZE] - last_path).norm();
 		last_path = estimator.Ps[WINDOW_SIZE];
-		ROS_INFO_STREAM("time:" << timestamp << " delay:" << ros::Time::now().toSec() - timestamp
-								<< " P:" << estimator.Ps[WINDOW_SIZE].transpose()
-								<< " V:" << estimator.Vs[WINDOW_SIZE].transpose()
-								<< " Q:" << estimator.Rs[WINDOW_SIZE].transpose() << " sum_of_path:" << sum_of_path);
+		ROS_INFO_STREAM(CYAN << "time:" << timestamp << " delay:" << ros::Time::now().toSec() - timestamp << " P:"
+							 << estimator.Ps[WINDOW_SIZE].transpose() << " V:" << estimator.Vs[WINDOW_SIZE].transpose()
+							 << "ypr:" << Utility::R2ypr(estimator.Rs[WINDOW_SIZE]) << " Q:"
+							 << estimator.Rs[WINDOW_SIZE].transpose() << " sum_of_path:" << sum_of_path << C_RESET);
 	}
 
 	if (ESTIMATE_EXTRINSIC) {

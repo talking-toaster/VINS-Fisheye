@@ -41,7 +41,7 @@ void Estimator::setParameter() {
 	for (int i = 0; i < NUM_OF_CAM; i++) {
 		tic[i] = TIC[i];
 		ric[i] = RIC[i];
-		cout << " exitrinsic cam " << i << endl << ric[i] << endl << tic[i].transpose() << endl;
+		std::cout << " exitrinsic cam " << i << endl << ric[i] << endl << tic[i].transpose() << endl;
 	}
 	f_manager.setRic(ric);
 	ProjectionTwoFrameOneCamFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
@@ -49,7 +49,7 @@ void Estimator::setParameter() {
 	ProjectionOneFrameTwoCamFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
 	td										  = TD;
 	g										  = G;
-	cout << "set g " << g.transpose() << endl;
+	std::cout << "set g " << g.transpose() << endl;
 
 	featureTracker->readIntrinsicParameter(CAM_NAMES);
 
@@ -107,13 +107,19 @@ void Estimator::inputIMU(double t, const Vector3d &linearAcceleration, const Vec
 	mBuf.unlock();
 }
 
-void Estimator::inputFeature(double t, const FeatureFrame &featureFrame) {
-	// mBuf.lock();
-	featureBuf.push(make_pair(t, featureFrame));
-	// mBuf.unlock();
+void Estimator::inputMag(double t, const Vector3d &mag) {
+	static Utility::LPF mag_lpf(1 / 80, 80);
+	if (magBuf.size() > 100)
+		magBuf.pop();
+	Eigen::Vector3d mag_lpfed = mag_lpf.update(mag);
+	magBuf.push(make_pair(t, mag_lpfed));
 }
 
+void Estimator::inputFeature(double t, const FeatureFrame &featureFrame) {
+	featureBuf.push(make_pair(t, featureFrame));
+}
 
+// 获取 (t0, t1] 间imu数据
 bool Estimator::getIMUInterval(double t0, double t1, vector<pair<double, Eigen::Vector3d>> &accVector,
 							   vector<pair<double, Eigen::Vector3d>> &gyrVector) {
 	if (accBuf.empty()) {
@@ -155,6 +161,37 @@ bool Estimator::getIMUInterval(double t0, double t1, vector<pair<double, Eigen::
 	return true;
 }
 
+bool Estimator::getMag(double t, Eigen::Vector3d &mag) {
+	if (magBuf.empty()) {
+		printf("not receive mag\n");
+		return false;
+	}
+	double			t1 = 0, t2, dt;
+	Eigen::Vector3d prev_mag;
+	Eigen::Vector3d next_mag;
+
+	while (magBuf.front() && magBuf.front()->first < t) {
+		std::pair<double, Eigen::Vector3d> mag_stamped;
+		if (!magBuf.try_pop(mag_stamped)) {
+			ROS_WARN("magBuf try_pop failed");
+			return false;
+		}
+		prev_mag = mag_stamped.second;
+		t1		 = t - mag_stamped.first;
+	}
+	// assert(!magBuf.empty() && "magBuf should not be empty");
+	if (!magBuf.empty()) {
+		next_mag = magBuf.front()->second;
+		t2		 = magBuf.front()->first - t;
+		assert(t1 >= 0 && t2 >= 0 && "t1 t2 should be positive");
+		dt	= t1 + t2;
+		mag = (t2 / dt) * prev_mag + (t1 / dt) * next_mag;
+	} else {
+		mag = prev_mag;
+	}
+	return true;
+}
+
 bool Estimator::IMUAvailable(double t) {
 	if (!accBuf.empty() && t <= accBuf.back().first)
 		return true;
@@ -169,6 +206,8 @@ void Estimator::processMeasurements() {
 		TicToc								  t_process;
 		pair<double, FeatureFrame>			  feature;
 		vector<pair<double, Eigen::Vector3d>> accVector, gyrVector;
+		bool								  mag_ok = false;
+		Eigen::Vector3d						  mag;
 		if (featureBuf.try_pop(feature)) {
 			if (solver_flag == Estimator::SolverFlag::NON_LINEAR) {
 				while (featureBuf.try_pop(feature))
@@ -195,9 +234,20 @@ void Estimator::processMeasurements() {
 			}
 			mBuf.unlock();
 
+			if (USE_MAG) {
+				mag_ok = getMag(curTime, mag);
+				if (!mag_ok) {
+					ROS_WARN("wait for mag");
+				}
+			}
+
 			if (USE_IMU) {
-				if (!initFirstPoseFlag)
-					initFirstIMUPose(accVector);
+				if (!initFirstPoseFlag) {
+					if (USE_MAG)
+						initFirstIMUPose(accVector, mag);
+					else
+						initFirstIMUPose(accVector);
+				}
 				for (size_t i = 0; i < accVector.size(); i++) {
 					double dt;
 					if (i == 0)
@@ -208,6 +258,8 @@ void Estimator::processMeasurements() {
 						dt = accVector[i].first - accVector[i - 1].first;
 					processIMU(accVector[i].first, dt, accVector[i].second, gyrVector[i].second);
 				}
+				if (USE_MAG)
+					processMag(mag);
 			}
 
 			processImage(feature.second, feature.first);
@@ -248,7 +300,7 @@ void Estimator::processMeasurements() {
 }
 
 
-void Estimator::initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVector) {
+void Estimator::initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVector, Eigen::Vector3d mag) {
 	printf("init first imu pose\n");
 	initFirstPoseFlag = true;
 	// return;
@@ -262,64 +314,26 @@ void Estimator::initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVecto
 	Matrix3d R0	 = Utility::g2R(averAcc);
 	double	 yaw = Utility::R2ypr(R0).x();
 	R0			 = Utility::ypr2R(Eigen::Vector3d{-yaw, 0, 0}) * R0;
-	Rs[0]		 = R0;
-	cout << "init R0 " << endl << Rs[0] << endl;
-	// Vs[0] = Vector3d(5, 0, 0);
+	if (USE_MAG && mag.norm() > 0) {
+		Vector3d mag_enu = R0 * mag;
+		double	 mag_yaw = atan2(mag_enu.y(), mag_enu.x()) * 180 / M_PI - 90; // 正东为0度
+		mag_yaw -= 5;
+		R0 = Utility::ypr2R(Eigen::Vector3d{mag_yaw, 0, 0}) * R0;
+		ROS_WARN("init yaw by mag %f", mag_yaw);
+	}
+	Rs[0] = R0;
+	std::cout << "init R0 " << endl << Rs[0] << endl;
+	ROS_INFO_STREAM("init ypr:" << Utility::R2ypr(R0).transpose());
 }
 
-void Estimator::initFirstPose(Eigen::Vector3d p, Eigen::Matrix3d r) {
-	Ps[0] = p;
-	Rs[0] = r;
-	initP = p;
-	initR = r;
-}
-
-
-void Estimator::clearState() {
-	for (int i = 0; i < WINDOW_SIZE + 1; i++) {
-		Rs[i].setIdentity();
-		Ps[i].setZero();
-		Vs[i].setZero();
-		Bas[i].setZero();
-		Bgs[i].setZero();
-		dt_buf[i].clear();
-		linear_acceleration_buf[i].clear();
-		angular_velocity_buf[i].clear();
-
-		if (pre_integrations[i] != nullptr) {
-			delete pre_integrations[i];
-		}
-		pre_integrations[i] = nullptr;
+void Estimator::processMag(const Vector3d &mag) {
+	if (frame_count == 0) {
+		Mw[0]  = Rs[0] * mag;
+		Bms[0] = Vector3d(0, 0, 0);
+	} else {
+		Mw[frame_count]	 = Mw[frame_count - 1];
+		Bms[frame_count] = Bms[frame_count - 1];
 	}
-
-	for (int i = 0; i < NUM_OF_CAM; i++) {
-		tic[i] = Vector3d::Zero();
-		ric[i] = Matrix3d::Identity();
-	}
-
-	first_imu = false, sum_of_back = 0;
-	sum_of_front	  = 0;
-	frame_count		  = 0;
-	solver_flag		  = INITIAL;
-	latest_P		  = Eigen::Vector3d::Zero();
-	latest_V		  = Eigen::Vector3d::Zero();
-	latest_Q		  = Eigen::Quaterniond::Identity();
-	fast_prop_inited  = false;
-	initial_timestamp = 0;
-	all_image_frame.clear();
-
-	if (tmp_pre_integration != nullptr)
-		delete tmp_pre_integration;
-	if (last_marginalization_info != nullptr)
-		delete last_marginalization_info;
-
-	tmp_pre_integration		  = nullptr;
-	last_marginalization_info = nullptr;
-	last_marginalization_parameter_blocks.clear();
-
-	f_manager.clearState();
-
-	failure_occur = 0;
 }
 
 void Estimator::processIMU(double t, double dt, const Vector3d &linear_acceleration, const Vector3d &angular_velocity) {
@@ -508,7 +522,60 @@ void Estimator::processImage(const FeatureFrame &image, const double header) {
 		}
 	}
 }
+void Estimator::initFirstPose(Eigen::Vector3d p, Eigen::Matrix3d r) {
+	Ps[0] = p;
+	Rs[0] = r;
+	initP = p;
+	initR = r;
+}
 
+
+void Estimator::clearState() {
+	for (int i = 0; i < WINDOW_SIZE + 1; i++) {
+		Rs[i].setIdentity();
+		Ps[i].setZero();
+		Vs[i].setZero();
+		Bas[i].setZero();
+		Bgs[i].setZero();
+		dt_buf[i].clear();
+		linear_acceleration_buf[i].clear();
+		angular_velocity_buf[i].clear();
+
+		if (pre_integrations[i] != nullptr) {
+			delete pre_integrations[i];
+		}
+		pre_integrations[i] = nullptr;
+	}
+
+	for (int i = 0; i < NUM_OF_CAM; i++) {
+		tic[i] = Vector3d::Zero();
+		ric[i] = Matrix3d::Identity();
+	}
+
+	first_imu = false, sum_of_back = 0;
+	sum_of_front	  = 0;
+	frame_count		  = 0;
+	solver_flag		  = INITIAL;
+	latest_P		  = Eigen::Vector3d::Zero();
+	latest_V		  = Eigen::Vector3d::Zero();
+	latest_Q		  = Eigen::Quaterniond::Identity();
+	fast_prop_inited  = false;
+	initial_timestamp = 0;
+	all_image_frame.clear();
+
+	if (tmp_pre_integration != nullptr)
+		delete tmp_pre_integration;
+	if (last_marginalization_info != nullptr)
+		delete last_marginalization_info;
+
+	tmp_pre_integration		  = nullptr;
+	last_marginalization_info = nullptr;
+	last_marginalization_parameter_blocks.clear();
+
+	f_manager.clearState();
+
+	failure_occur = 0;
+}
 void Estimator::vector2double() {
 	for (int i = 0; i <= WINDOW_SIZE; i++) {
 		para_Pose[i][0] = Ps[i].x();
@@ -828,7 +895,7 @@ void Estimator::optimization() {
 	TicToc				   t_solver;
 	ceres::Solver::Summary summary;
 	ceres::Solve(options, &problem, &summary);
-	cout << summary.BriefReport() << endl;
+	std::cout << summary.BriefReport() << endl;
 	// std::cout << summary.FullReport() << endl;
 	static double sum_iterations = 0;
 	static double sum_solve_time = 0;

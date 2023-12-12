@@ -20,7 +20,7 @@ class RW_Queue {
 	void   pop();
 	bool   try_pop();
 	bool   try_pop(T &value);
-	T	  &front();
+	T	  *front();
 	bool   empty();
 	size_t size();
 	void   clear();
@@ -49,8 +49,8 @@ bool RW_Queue<T>::try_pop(T &value) {
 	return queue_.try_dequeue(value);
 }
 template <typename T>
-T &RW_Queue<T>::front() {
-	return *queue_.peek();
+T *RW_Queue<T>::front() {
+	return queue_.peek();
 }
 template <typename T>
 bool RW_Queue<T>::empty() {

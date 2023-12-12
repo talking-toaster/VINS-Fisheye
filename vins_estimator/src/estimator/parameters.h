@@ -79,6 +79,10 @@ extern double IMAGE_FREQ;
 
 extern int WARN_IMU_DURATION;
 
+extern bool		   USE_MAG;
+extern std::string MAG_TOPIC;
+
+
 void readParameters(std::string config_file);
 
 enum SIZE_PARAMETERIZATION { SIZE_POSE = 7, SIZE_SPEEDBIAS = 9, SIZE_FEATURE = 1 };

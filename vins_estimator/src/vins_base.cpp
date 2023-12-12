@@ -11,7 +11,8 @@ void VinsNodeBaseClass::imgs_callback(const sensor_msgs::ImageConstPtr &img1_msg
 	// cv::imwrite("/swarm/fisheye_ws/output/img_left1.png", img1->image);
 	// cv::imwrite("/swarm/fisheye_ws/output/img_right1.png", img2->image);
 	estimator.inputImage(img1_msg->header.stamp.toSec(), img1->image, img2->image);
-	stero_buf.push(std::make_pair(img1->image, img2->image));
+	if (ENABLE_DEPTH)
+		stero_buf.push(std::make_pair(img1->image, img2->image));
 }
 
 void VinsNodeBaseClass::imu_callback(const sensor_msgs::ImuConstPtr &imu_msg) {
@@ -25,6 +26,14 @@ void VinsNodeBaseClass::imu_callback(const sensor_msgs::ImuConstPtr &imu_msg) {
 	Vector3d acc(dx, dy, dz);
 	Vector3d gyr(rx, ry, rz);
 	estimator.inputIMU(t, acc, gyr);
+}
+void VinsNodeBaseClass::mag_callback(const sensor_msgs::MagneticFieldConstPtr &mag_msg) {
+	double	 t	= mag_msg->header.stamp.toSec();
+	double	 mx = mag_msg->magnetic_field.x;
+	double	 my = mag_msg->magnetic_field.y;
+	double	 mz = mag_msg->magnetic_field.z;
+	Vector3d mag(mx, my, mz); // 传到后端为ENU坐标系
+	estimator.inputMag(t, mag);
 }
 
 void VinsNodeBaseClass::restart_callback(const std_msgs::BoolConstPtr &restart_msg) {
@@ -75,6 +84,11 @@ void VinsNodeBaseClass::Init(ros::NodeHandle &n) {
 	sync =
 		new message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::Image>(*image_sub_l, *image_sub_r, 1000);
 	sync->registerCallback(boost::bind(&VinsNodeBaseClass::imgs_callback, (VinsNodeBaseClass *)this, _1, _2));
+	if (USE_MAG) {
+		sub_mag = n.subscribe(MAG_TOPIC, 10, &VinsNodeBaseClass::mag_callback, (VinsNodeBaseClass *)this,
+							  ros::TransportHints().tcpNoDelay(true));
+	}
+
 
 	if (SHOW_TRACK) {
 		show_track_thread = std::thread([&]() {
@@ -89,20 +103,22 @@ void VinsNodeBaseClass::Init(ros::NodeHandle &n) {
 		});
 	}
 
-	depth_estimator_thread = std::thread([&]() {
-		while (1) {
-			std::pair<cv::Mat, cv::Mat> stero_pair;
-			ros::Rate					r(10);
-			if (stero_buf.try_pop(stero_pair)) {
-				while (stero_buf.try_pop(stero_pair))
-					;
-				TicToc t_depth;
-				depth_estimator.calculate_depth(stero_pair.first, stero_pair.second);
-				ROS_INFO_STREAM("depth used: " << t_depth.toc() << " ms.");
-				cv::imshow("depth", depth_estimator.depth_img);
-				cv::waitKey(1);
-				r.sleep();
+	if (ENABLE_DEPTH) {
+		depth_estimator_thread = std::thread([&]() {
+			while (1) {
+				std::pair<cv::Mat, cv::Mat> stero_pair;
+				ros::Rate					r(10);
+				if (stero_buf.try_pop(stero_pair)) {
+					while (stero_buf.try_pop(stero_pair))
+						;
+					TicToc t_depth;
+					depth_estimator.calculate_depth(stero_pair.first, stero_pair.second);
+					ROS_INFO_STREAM("depth used: " << t_depth.toc() << " ms.");
+					cv::imshow("depth", depth_estimator.depth_img);
+					cv::waitKey(1);
+					r.sleep();
+				}
 			}
-		}
-	});
+		});
+	}
 }

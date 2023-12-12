@@ -50,11 +50,13 @@ class Estimator {
 	void inputIMU(double t, const Vector3d &linearAcceleration, const Vector3d &angularVelocity);
 	void inputFeature(double t, const FeatureFrame &featureFrame);
 	void inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1 = cv::Mat());
+	void inputMag(double t, const Vector3d &mag);
 
 	bool is_next_odometry_frame();
 	void processIMU(double t, double dt, const Vector3d &linear_acceleration, const Vector3d &angular_velocity);
 	void processImage(const FeatureFrame &image, const double header);
 	void processMeasurements();
+	void processMag(const Vector3d &mag);
 
 	void processDepthGeneration();
 
@@ -69,6 +71,7 @@ class Estimator {
 	bool   failureDetection();
 	bool   getIMUInterval(double t0, double t1, vector<pair<double, Eigen::Vector3d>> &accVector,
 						  vector<pair<double, Eigen::Vector3d>> &gyrVector);
+	bool   getMag(double t, Eigen::Vector3d &mag);
 	void   getPoseInWorldFrame(Eigen::Matrix4d &T);
 	void   getPoseInWorldFrame(int index, Eigen::Matrix4d &T);
 	void   predictPtsInNextFrame();
@@ -78,20 +81,22 @@ class Estimator {
 	void   updateLatestStates();
 	void   fastPredictIMU(double t, Eigen::Vector3d linear_acceleration, Eigen::Vector3d angular_velocity);
 	bool   IMUAvailable(double t);
-	void   initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVector);
+	void   initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVector,
+							Eigen::Vector3d						   mag = Eigen::Vector3d(0, 0, 0));
 
 	enum SolverFlag { INITIAL, NON_LINEAR };
 
 	enum MarginalizationFlag { MARGIN_OLD = 0, MARGIN_SECOND_NEW = 1 };
 
-	std::mutex							 mBuf;
-	std::mutex							 odomBuf;
-	queue<pair<double, Eigen::Vector3d>> accBuf;
-	queue<pair<double, Eigen::Vector3d>> gyrBuf;
-	RW_Queue<pair<double, FeatureFrame>> featureBuf;
-	double								 prevTime, curTime;
-	bool								 openExEstimation;
-	RW_Queue<cv::Mat>					 image_show_buf;
+	std::mutex									 mBuf;
+	std::mutex									 odomBuf;
+	queue<pair<double, Eigen::Vector3d>>		 accBuf;
+	queue<pair<double, Eigen::Vector3d>>		 gyrBuf;
+	RW_Queue<pair<double, FeatureFrame>>		 featureBuf;
+	double										 prevTime, curTime;
+	bool										 openExEstimation;
+	RW_Queue<cv::Mat>							 image_show_buf;
+	RW_Queue<std::pair<double, Eigen::Vector3d>> magBuf;
 
 	std::thread trackThread;
 	std::thread processThread;
@@ -111,6 +116,8 @@ class Estimator {
 	Matrix3d Rs[(WINDOW_SIZE + 1)];
 	Vector3d Bas[(WINDOW_SIZE + 1)];
 	Vector3d Bgs[(WINDOW_SIZE + 1)];
+	Vector3d Mw[(WINDOW_SIZE + 1)];	 // mag in world frame , ENU
+	Vector3d Bms[(WINDOW_SIZE + 1)]; // bias of mag
 	double	 td;
 
 	Matrix3d back_R0, last_R, last_R0;
