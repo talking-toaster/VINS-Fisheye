@@ -32,6 +32,7 @@ ros::Publisher pub_viokeyframe;
 ros::Publisher pub_viononkeyframe;
 ros::Publisher pub_bias;
 ros::Publisher pub_ypr;
+ros::Publisher pub_keyframe_mark; // 可视化关键帧位置
 
 CameraPoseVisualization cameraposevisual(1, 0, 0, 1);
 
@@ -55,6 +56,7 @@ void registerPub(ros::NodeHandle &n) {
 	pub_flatten_images	   = n.advertise<vins::FlattenImages>("flatten_images", 1000);
 	pub_bias			   = n.advertise<sensor_msgs::Imu>("imu_bias", 1000);
 	pub_ypr				   = n.advertise<geometry_msgs::PointStamped>("ypr", 1000);
+	pub_keyframe_mark	   = n.advertise<sensor_msgs::PointCloud>("keyframe_mark", 1000);
 
 	cameraposevisual.setScale(0.1);
 	cameraposevisual.setLineWidth(0.01);
@@ -550,4 +552,18 @@ void pubKeyframe(const Estimator &estimator) {
 		pub_keyframe_point.publish(point_cloud);
 		pub_viokeyframe.publish(vkf);
 	}
+}
+
+void pub_Keyframe_Mark(const Estimator &estimator, const std_msgs::Header &header) {
+	sensor_msgs::PointCloud keyframe_mark;
+	keyframe_mark.header = header;
+
+	for (int i = 0; i < WINDOW_SIZE; i++) {
+		geometry_msgs::Point32 p;
+		p.x = estimator.Ps[i].x();
+		p.y = estimator.Ps[i].y();
+		p.z = estimator.Ps[i].z();
+		keyframe_mark.points.push_back(p);
+	}
+	pub_keyframe_mark.publish(keyframe_mark);
 }

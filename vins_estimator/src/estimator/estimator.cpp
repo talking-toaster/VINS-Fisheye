@@ -280,6 +280,7 @@ void Estimator::processMeasurements() {
 			pubKeyframe(*this);
 			pubTF(*this, header);
 			pub_Log(*this, header);
+			pub_Keyframe_Mark(*this, header);
 
 
 
