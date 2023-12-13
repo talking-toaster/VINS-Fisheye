@@ -12,6 +12,7 @@
 #include "featureTracker/feature_tracker_cpu.hpp"
 #include "featureTracker/feature_tracker_cuda.hpp"
 #include "featureTracker/feature_tracker_cuda_async.hpp"
+#include "factor/mag_factor.hpp"
 
 Estimator::Estimator() : f_manager{Rs} {
 	ROS_INFO("init begins");
@@ -234,19 +235,19 @@ void Estimator::processMeasurements() {
 			}
 			mBuf.unlock();
 
-			if (USE_MAG) {
-				mag_ok = getMag(curTime, mag);
-				if (!mag_ok) {
-					ROS_WARN("wait for mag");
-				}
-			}
 
 			if (USE_IMU) {
 				if (!initFirstPoseFlag) {
-					if (USE_MAG)
+					if (USE_MAG) {
+						while (!getMag(curTime, mag)) {
+							ROS_WARN("wait for mag");
+							std::this_thread::sleep_for(std::chrono::milliseconds(5));
+						}
+						// ROS_INFO_STREAM("========mag:" << mag.transpose());
 						initFirstIMUPose(accVector, mag);
-					else
+					} else {
 						initFirstIMUPose(accVector);
+					}
 				}
 				for (size_t i = 0; i < accVector.size(); i++) {
 					double dt;
@@ -278,6 +279,7 @@ void Estimator::processMeasurements() {
 			pubPointCloud(*this, header);
 			pubKeyframe(*this);
 			pubTF(*this, header);
+			pub_Log(*this, header);
 
 
 
@@ -314,10 +316,13 @@ void Estimator::initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVecto
 	Matrix3d R0	 = Utility::g2R(averAcc);
 	double	 yaw = Utility::R2ypr(R0).x();
 	R0			 = Utility::ypr2R(Eigen::Vector3d{-yaw, 0, 0}) * R0;
+	ROS_INFO_STREAM("mag:" << mag.transpose());
 	if (USE_MAG && mag.norm() > 0) {
 		Vector3d mag_enu = R0 * mag;
-		double	 mag_yaw = atan2(mag_enu.y(), mag_enu.x()) * 180 / M_PI - 90; // 正东为0度
-		mag_yaw -= 5;
+		if (mag_enu.y() == 0)
+			mag_enu.y() = 1e-20;
+		double mag_yaw = atan2(mag_enu.x(), mag_enu.y()) * 180 / M_PI; // 正东为0度
+		mag_yaw += 6;
 		R0 = Utility::ypr2R(Eigen::Vector3d{mag_yaw, 0, 0}) * R0;
 		ROS_WARN("init yaw by mag %f", mag_yaw);
 	}
@@ -334,6 +339,7 @@ void Estimator::processMag(const Vector3d &mag) {
 		Mw[frame_count]	 = Mw[frame_count - 1];
 		Bms[frame_count] = Bms[frame_count - 1];
 	}
+	mag_measure[frame_count] = mag;
 }
 
 void Estimator::processIMU(double t, double dt, const Vector3d &linear_acceleration, const Vector3d &angular_velocity) {
@@ -451,6 +457,11 @@ void Estimator::processImage(const FeatureFrame &image, const double header) {
 			Rs[frame_count]	 = Rs[prev_frame];
 			Bas[frame_count] = Bas[prev_frame];
 			Bgs[frame_count] = Bgs[prev_frame];
+			if (USE_MAG) {
+				Mw[frame_count]			 = Mw[prev_frame];
+				Bms[frame_count]		 = Bms[prev_frame];
+				mag_measure[frame_count] = mag_measure[prev_frame];
+			}
 		}
 
 	} else {
@@ -537,6 +548,11 @@ void Estimator::clearState() {
 		Vs[i].setZero();
 		Bas[i].setZero();
 		Bgs[i].setZero();
+		if (USE_MAG) {
+			Mw[i].setZero();
+			Bms[i].setZero();
+			mag_measure[i].setZero();
+		}
 		dt_buf[i].clear();
 		linear_acceleration_buf[i].clear();
 		angular_velocity_buf[i].clear();
@@ -600,6 +616,14 @@ void Estimator::vector2double() {
 			para_SpeedBias[i][7] = Bgs[i].y();
 			para_SpeedBias[i][8] = Bgs[i].z();
 		}
+		if (USE_MAG) {
+			para_mag[i][0] = Mw[i].x();
+			para_mag[i][1] = Mw[i].y();
+			para_mag[i][2] = Mw[i].z();
+			para_mag[i][3] = Bms[i].x();
+			para_mag[i][4] = Bms[i].y();
+			para_mag[i][5] = Bms[i].z();
+		}
 	}
 
 	for (int i = 0; i < NUM_OF_CAM; i++) {
@@ -643,6 +667,7 @@ void Estimator::double2vector() {
 			Quaterniond(para_Pose[0][6], para_Pose[0][3], para_Pose[0][4], para_Pose[0][5]).toRotationMatrix());
 		double y_diff = origin_R0.x() - origin_R00.x();
 		// TODO
+		// ???
 		Matrix3d rot_diff = Utility::ypr2R(Vector3d(y_diff, 0, 0));
 		if (abs(abs(origin_R0.y()) - 90) < 1.0 || abs(abs(origin_R00.y()) - 90) < 1.0) {
 			ROS_DEBUG("euler singular point!");
@@ -675,6 +700,12 @@ void Estimator::double2vector() {
 						.toRotationMatrix();
 
 			Ps[i] = Vector3d(para_Pose[i][0], para_Pose[i][1], para_Pose[i][2]);
+		}
+	}
+	if (USE_MAG) {
+		for (int i = 0; i <= WINDOW_SIZE; i++) {
+			Mw[i]  = Vector3d(para_mag[i][0], para_mag[i][1], para_mag[i][2]);
+			Bms[i] = Vector3d(para_mag[i][3], para_mag[i][4], para_mag[i][5]);
 		}
 	}
 
@@ -713,6 +744,12 @@ bool Estimator::failureDetection() {
 	if (Bgs[WINDOW_SIZE].norm() > 1.0) {
 		ROS_INFO(" big IMU gyr bias estimation %f", Bgs[WINDOW_SIZE].norm());
 		return true;
+	}
+	if (USE_MAG) {
+		if (Bms[WINDOW_SIZE].norm() > 0.5) {
+			ROS_INFO(" big mag bias estimation %f", Bms[WINDOW_SIZE].norm());
+			return true;
+		}
 	}
 	/*
 	if (tic(0) > 1)
@@ -757,6 +794,8 @@ void Estimator::optimization() {
 		problem.AddParameterBlock(para_Pose[i], SIZE_POSE, local_parameterization);
 		if (USE_IMU)
 			problem.AddParameterBlock(para_SpeedBias[i], SIZE_SPEEDBIAS);
+		if (USE_MAG)
+			problem.AddParameterBlock(para_mag[i], SIZE_MAG);
 	}
 	if (!USE_IMU)
 		problem.SetParameterBlockConstant(para_Pose[0]);
@@ -790,6 +829,23 @@ void Estimator::optimization() {
 			IMUFactor *imu_factor = new IMUFactor(pre_integrations[j]);
 			problem.AddResidualBlock(imu_factor, NULL, para_Pose[i], para_SpeedBias[i], para_Pose[j],
 									 para_SpeedBias[j]);
+		}
+	}
+	if (USE_MAG) {
+		Eigen::Matrix3d mag_measure_sqrt_info =
+			Eigen::LLT<Eigen::Matrix3d>(Eigen::Matrix3d::Identity() / MAG_MEASURE_NOISE).matrixL().transpose();
+		Eigen::Matrix3d mag_world_sqrt_info =
+			Eigen::LLT<Eigen::Matrix3d>(Eigen::Matrix3d::Identity() / MAG_WORLD_NOISE).matrixL().transpose();
+		Eigen::Matrix3d mag_bias_sqrt_info =
+			Eigen::LLT<Eigen::Matrix3d>(Eigen::Matrix3d::Identity() / MAG_BIAS_NOISE).matrixL().transpose();
+		for (int i = 0; i < frame_count; i++) {
+			int	 j			= i + 1;
+			auto mag_factor = MagFactor::Create(mag_measure[i], mag_measure_sqrt_info);
+			problem.AddResidualBlock(mag_factor, NULL, para_Pose[i], para_mag[i]);
+			auto mag_world_factor = MagWorldFactor::Create(mag_world_sqrt_info);
+			problem.AddResidualBlock(mag_world_factor, NULL, para_mag[i], para_mag[j]);
+			auto mag_bias_factor = MagBiasFactor::Create(mag_bias_sqrt_info);
+			problem.AddResidualBlock(mag_bias_factor, NULL, para_mag[i], para_mag[j]);
 		}
 	}
 
@@ -1110,6 +1166,11 @@ void Estimator::slideWindow() {
 					Bas[i].swap(Bas[i + 1]);
 					Bgs[i].swap(Bgs[i + 1]);
 				}
+				if (USE_MAG) {
+					Mw[i].swap(Mw[i + 1]);
+					Bms[i].swap(Bms[i + 1]);
+					mag_measure[i].swap(mag_measure[i + 1]);
+				}
 			}
 			Headers[WINDOW_SIZE] = Headers[WINDOW_SIZE - 1];
 			Ps[WINDOW_SIZE]		 = Ps[WINDOW_SIZE - 1];
@@ -1126,6 +1187,10 @@ void Estimator::slideWindow() {
 				dt_buf[WINDOW_SIZE].clear();
 				linear_acceleration_buf[WINDOW_SIZE].clear();
 				angular_velocity_buf[WINDOW_SIZE].clear();
+			}
+			if (USE_MAG) {
+				Mw[WINDOW_SIZE]	 = Mw[WINDOW_SIZE - 1];
+				Bms[WINDOW_SIZE] = Bms[WINDOW_SIZE - 1];
 			}
 
 			if (true || solver_flag == INITIAL) {
@@ -1165,6 +1230,11 @@ void Estimator::slideWindow() {
 				dt_buf[WINDOW_SIZE].clear();
 				linear_acceleration_buf[WINDOW_SIZE].clear();
 				angular_velocity_buf[WINDOW_SIZE].clear();
+			}
+			if (USE_MAG) {
+				Mw[frame_count - 1]			 = Mw[frame_count];
+				Bms[frame_count - 1]		 = Bms[frame_count];
+				mag_measure[frame_count - 1] = mag_measure[frame_count];
 			}
 			slideWindowNew();
 		}
@@ -1353,6 +1423,9 @@ void Estimator::updateLatestStates() {
 	latest_V										= Vs[frame_count];
 	latest_Ba										= Bas[frame_count];
 	latest_Bg										= Bgs[frame_count];
+	latest_Mw										= Mw[frame_count];
+	latest_Bm										= Bms[frame_count];
+	latest_mag_measure								= mag_measure[frame_count];
 	fast_prop_inited								= true;
 	latest_acc_0									= acc_0;
 	latest_gyr_0									= gyr_0;

@@ -123,6 +123,7 @@ class Estimator {
 	Matrix3d back_R0, last_R, last_R0;
 	Vector3d back_P0, last_P, last_P0;
 	double	 Headers[(WINDOW_SIZE + 1)];
+	Vector3d mag_measure[(WINDOW_SIZE + 1)]; // 磁力计测量值
 
 	IntegrationBase *pre_integrations[(WINDOW_SIZE + 1)] = {0};
 	Vector3d		 acc_0, gyr_0;
@@ -155,6 +156,7 @@ class Estimator {
 
 	double			   para_Pose[WINDOW_SIZE + 1][SIZE_POSE];
 	double			   para_SpeedBias[WINDOW_SIZE + 1][SIZE_SPEEDBIAS];
+	double			   para_mag[WINDOW_SIZE + 1][SIZE_MAG];
 	double			   para_Feature[NUM_OF_F][SIZE_FEATURE];
 	std::vector<int>   param_feature_id;
 	std::map<int, int> param_feature_id_to_index;
@@ -174,8 +176,9 @@ class Estimator {
 	Eigen::Vector3d initP;
 	Eigen::Matrix3d initR;
 
-	double			   latest_time;
-	Eigen::Vector3d	   latest_P, latest_V, latest_Ba, latest_Bg, latest_acc_0, latest_gyr_0;
+	double			latest_time;
+	Eigen::Vector3d latest_P, latest_V, latest_Ba, latest_Bg, latest_acc_0, latest_gyr_0, latest_Mw, latest_Bm,
+		latest_mag_measure;
 	Eigen::Quaterniond latest_Q;
 	bool			   fast_prop_inited;
 

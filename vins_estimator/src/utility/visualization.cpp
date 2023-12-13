@@ -31,6 +31,7 @@ ros::Publisher pub_extrinsic;
 ros::Publisher pub_viokeyframe;
 ros::Publisher pub_viononkeyframe;
 ros::Publisher pub_bias;
+ros::Publisher pub_ypr;
 
 CameraPoseVisualization cameraposevisual(1, 0, 0, 1);
 
@@ -53,9 +54,20 @@ void registerPub(ros::NodeHandle &n) {
 	pub_viononkeyframe	   = n.advertise<vins::VIOKeyframe>("viononkeyframe", 1000);
 	pub_flatten_images	   = n.advertise<vins::FlattenImages>("flatten_images", 1000);
 	pub_bias			   = n.advertise<sensor_msgs::Imu>("imu_bias", 1000);
+	pub_ypr				   = n.advertise<geometry_msgs::PointStamped>("ypr", 1000);
 
 	cameraposevisual.setScale(0.1);
 	cameraposevisual.setLineWidth(0.01);
+}
+
+void pub_Log(const Estimator &estimator, const std_msgs::Header &header) {
+	Eigen::Vector3d				ypr = Utility::R2ypr(estimator.Rs[WINDOW_SIZE]);
+	geometry_msgs::PointStamped ypr_msg;
+	ypr_msg.header	= header;
+	ypr_msg.point.x = ypr.x();
+	ypr_msg.point.y = ypr.y();
+	ypr_msg.point.z = ypr.z();
+	pub_ypr.publish(ypr_msg);
 }
 
 

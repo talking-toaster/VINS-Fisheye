@@ -9,6 +9,11 @@
 
 #include "estimator/parameters.h"
 
+double MAG_MEASURE_NOISE;
+double MAG_WORLD_NOISE;
+double MAG_BIAS_NOISE;
+
+
 double INIT_DEPTH;
 double MIN_PARALLAX;
 double ACC_N, ACC_W;
@@ -90,8 +95,13 @@ void readParameters(std::string config_file) {
 		std::cerr << "ERROR: Wrong path to settings" << std::endl;
 	}
 	USE_MAG = readParam<bool>("use_mag");
-	if (USE_MAG)
-		MAG_TOPIC = readParam<std::string>("mag_topic");
+	if (USE_MAG) {
+		MAG_TOPIC		  = readParam<std::string>("mag_topic");
+		MAG_MEASURE_NOISE = readParam<double>("mag_measure_noise");
+		MAG_WORLD_NOISE	  = readParam<double>("mag_world_noise");
+		MAG_BIAS_NOISE	  = readParam<double>("mag_bias_noise");
+	}
+
 
 	IMAGE0_TOPIC = readParam<std::string>("image0_topic");
 	IMAGE1_TOPIC = readParam<std::string>("image1_topic");
