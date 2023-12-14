@@ -719,7 +719,7 @@ void Estimator::double2vector() {
 		}
 	}
 
-	std::map<int, double> deps;
+	std::map<int, double> deps; // pst_id, depth_inv
 	for (unsigned int i = 0; i < param_feature_id.size(); i++) {
 		int _id = param_feature_id[i];
 		// ROS_INFO("Id %d depth %f", i, 1/para_Feature[i][0]);
@@ -908,11 +908,11 @@ void Estimator::optimization() {
 						pts_i, pts_j_right, it_per_id.feature_per_frame[0].velocity, it_per_frame.velocityRight,
 						it_per_id.feature_per_frame[0].cur_td, it_per_frame.cur_td);
 
-					std::vector<double *> param_blocks;
-					param_blocks.push_back(para_Ex_Pose[0]);
-					param_blocks.push_back(para_Ex_Pose[1]);
-					param_blocks.push_back(para_Feature[feature_index]);
-					param_blocks.push_back(para_Td[0]);
+					// std::vector<double *> param_blocks;
+					// param_blocks.push_back(para_Ex_Pose[0]);
+					// param_blocks.push_back(para_Ex_Pose[1]);
+					// param_blocks.push_back(para_Feature[feature_index]);
+					// param_blocks.push_back(para_Td[0]);
 					// ROS_INFO("Check ProjectionOneFrameTwoCamFactor ID: %d, index %d depth init %f Velocity L %f %f %f
 					// R %f %f %f", it_per_id.feature_id, feature_index,
 					//     para_Feature[feature_index][0],
@@ -930,8 +930,8 @@ void Estimator::optimization() {
 			f_m_cnt++;
 		}
 	}
-
-	ROS_DEBUG("visual measurement count: %d", f_m_cnt);
+	if (ENABLE_PERF_OUTPUT)
+		ROS_INFO("visual measurement pts count: %d", f_m_cnt);
 	// printf("prepare for ceres: %f \n", t_prepare.toc());
 
 	ceres::Solver::Options options;
@@ -1080,7 +1080,7 @@ void Estimator::optimization() {
 		last_marginalization_info			  = marginalization_info;
 		last_marginalization_parameter_blocks = parameter_blocks;
 
-	} else {
+	} else { // MARGIN_NEW
 		if (last_marginalization_info &&
 			std::count(std::begin(last_marginalization_parameter_blocks),
 					   std::end(last_marginalization_parameter_blocks), para_Pose[WINDOW_SIZE - 1])) {

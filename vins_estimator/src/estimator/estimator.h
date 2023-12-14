@@ -141,7 +141,6 @@ class Estimator {
 	double mea_sum_time	   = 0;
 
 	FeatureManager	  f_manager;
-	MotionEstimator	  m_estimator;
 	InitialEXRotation initial_ex_rotation;
 
 	bool first_imu;
@@ -158,7 +157,7 @@ class Estimator {
 	double			   para_SpeedBias[WINDOW_SIZE + 1][SIZE_SPEEDBIAS];
 	double			   para_mag[WINDOW_SIZE + 1][SIZE_MAG];
 	double			   para_Feature[NUM_OF_F][SIZE_FEATURE];
-	std::vector<int>   param_feature_id;
+	std::vector<int>   param_feature_id; // 后端参于计算的特征点id
 	std::map<int, int> param_feature_id_to_index;
 	double			   para_Ex_Pose[2][SIZE_POSE];
 	double			   para_Retrive_Pose[SIZE_POSE];

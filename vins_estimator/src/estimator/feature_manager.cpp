@@ -55,15 +55,15 @@ bool FeatureManager::addFeatureCheckParallax(int frame_count, const FeatureFrame
 		// In common stereo; the pts in left must in right
 		// But for stereo fisheye; this is not true due to the downward top view
 		// We need to modified this to enable downward top view
-		//  assert(id_pts.second[0].first == 0);
-		if (id_pts.second[0].first != 0) {
-			// This point is right/down observation only
-			f_per_fra.camera = 1;
-		}
+		assert(id_pts.second[0].first == 0 && "pts must be in left cam");
+		// if (id_pts.second[0].first != 0) { //cam_id
+		// 	// This point is right/down observation only
+		// 	f_per_fra.camera = 1;
+		// }
 
 		if (id_pts.second.size() == 2) {
 			// ROS_INFO("Stereo feature %d", id_pts.first);
-			f_per_fra.rightObservation(id_pts.second[1].second);
+			f_per_fra.rightObservation(id_pts.second[1].second); // 参数 Matrix<double,8,1>
 			// assert(id_pts.second[1].first == 1);
 			if (id_pts.second[1].first != 1) {
 				ROS_ERROR("Bug occurs on pt, skip");
@@ -190,9 +190,9 @@ std::map<int, double> FeatureManager::getDepthVector() {
 		bool id_in_outouliers = outlier_features.find(it_per_id.feature_id) != outlier_features.end();
 
 		if (it_per_id.is_stereo && it_per_id.used_num >= 2 && int(dep_vec.size()) < MAX_SOLVE_CNT &&
-			it_per_id.good_for_solving && !id_in_outouliers) {
+			it_per_id.good_for_solving && !id_in_outouliers) { // 优先用双目跟踪的点
 			dep_vec[it_per_id.feature_id] = 1. / it_per_id.estimated_depth;
-			ft->setFeatureStatus(it_per_id.feature_id, 3);
+			ft->setFeatureStatus(it_per_id.feature_id, 3); // good
 		} else {
 			it_per_id.need_triangulation = true;
 		}
@@ -203,7 +203,7 @@ std::map<int, double> FeatureManager::getDepthVector() {
 		bool id_in_outouliers = outlier_features.find(it_per_id.feature_id) != outlier_features.end();
 
 		if (int(dep_vec.size()) < MAX_SOLVE_CNT && it_per_id.used_num >= 4 && it_per_id.good_for_solving &&
-			!id_in_outouliers) {
+			!id_in_outouliers) { // 其次用单目, 但是要求至少4帧观测
 			dep_vec[it_per_id.feature_id] = 1. / it_per_id.estimated_depth;
 			ft->setFeatureStatus(it_per_id.feature_id, 3);
 		} else {

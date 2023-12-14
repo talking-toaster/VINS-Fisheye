@@ -36,10 +36,10 @@ using namespace camodocal;
 using namespace Eigen;
 
 
-typedef Eigen::Matrix<double, 8, 1> TrackFeatureNoId;
-typedef pair<int, TrackFeatureNoId> TrackFeature;
-typedef vector<TrackFeature>		FeatureFramenoId;
-typedef map<int, FeatureFramenoId>	FeatureFrame;
+typedef Eigen::Matrix<double, 8, 1> TrackFeatureNoId; // Matrix<double, 8, 1>
+typedef pair<int, TrackFeatureNoId> TrackFeature;	  // pair < cam_id, Matrix<8,1> >
+typedef vector<TrackFeature>		FeatureFramenoId; // vector < pair < cam_id, Matrix<8,1> > >
+typedef map<int, FeatureFramenoId>	FeatureFrame;	  // id - vector < pair < cam_id, Matrix<8,1> > >
 
 class Estimator;
 
