@@ -192,7 +192,7 @@ std::map<int, double> FeatureManager::getDepthVector() {
 		if (it_per_id.is_stereo && it_per_id.used_num >= 2 && int(dep_vec.size()) < MAX_SOLVE_CNT &&
 			it_per_id.good_for_solving && !id_in_outouliers) { // 优先用双目跟踪的点
 			dep_vec[it_per_id.feature_id] = 1. / it_per_id.estimated_depth;
-			ft->setFeatureStatus(it_per_id.feature_id, 3); // good
+			ft->setFeatureStatus(it_per_id.feature_id, PtsStatus::Good); // good
 		} else {
 			it_per_id.need_triangulation = true;
 		}
@@ -205,7 +205,7 @@ std::map<int, double> FeatureManager::getDepthVector() {
 		if (int(dep_vec.size()) < MAX_SOLVE_CNT && it_per_id.used_num >= 4 && it_per_id.good_for_solving &&
 			!id_in_outouliers) { // 其次用单目, 但是要求至少4帧观测
 			dep_vec[it_per_id.feature_id] = 1. / it_per_id.estimated_depth;
-			ft->setFeatureStatus(it_per_id.feature_id, 3);
+			ft->setFeatureStatus(it_per_id.feature_id, PtsStatus::Good); // good
 		} else {
 			it_per_id.need_triangulation = true;
 		}
@@ -375,7 +375,7 @@ void FeatureManager::triangulate(int frameCnt, Vector3d Ps[], Matrix3d Rs[], Vec
 		}
 		if (outlier_features.find(it_per_id.feature_id) != outlier_features.end()) {
 			// Is in outliers
-			ft->setFeatureStatus(it_per_id.feature_id, -1);
+			ft->setFeatureStatus(it_per_id.feature_id, PtsStatus::Outlier); // -1 ,outlier
 			continue;
 		}
 
@@ -396,7 +396,7 @@ void FeatureManager::triangulate(int frameCnt, Vector3d Ps[], Matrix3d Rs[], Vec
 		for (unsigned int frame = 0; frame < it_per_id.feature_per_frame.size(); frame++) {
 			int							imu_i = it_per_id.start_frame + frame;
 			Eigen::Matrix<double, 3, 4> leftPose;
-			Eigen::Vector3d				t0 = Ps[imu_i] + Rs[imu_i] * tic[main_cam_id];
+			Eigen::Vector3d				t0 = Ps[imu_i] + Rs[imu_i] * tic[main_cam_id]; // t wc
 			_max.x()					   = max(t0.x(), _max.x());
 			_max.y()					   = max(t0.y(), _max.y());
 			_max.z()					   = max(t0.z(), _max.z());
@@ -406,7 +406,7 @@ void FeatureManager::triangulate(int frameCnt, Vector3d Ps[], Matrix3d Rs[], Vec
 			_min.z() = min(t0.z(), _min.z());
 
 			Eigen::Matrix3d R0		= Rs[imu_i] * ric[main_cam_id];
-			leftPose.leftCols<3>()	= R0.transpose();
+			leftPose.leftCols<3>()	= R0.transpose(); // Rcw
 			leftPose.rightCols<1>() = -R0.transpose() * t0;
 			Eigen::Vector3d point0	= it_per_id.feature_per_frame[frame].point;
 
@@ -460,14 +460,14 @@ void FeatureManager::triangulate(int frameCnt, Vector3d Ps[], Matrix3d Rs[], Vec
 			//     it_per_id.feature_per_frame[0].is_stereo,
 			//     poses.size(),
 			//     it_per_id.depth_inited, it_per_id.estimated_depth, err);
-			ft->setFeatureStatus(it_per_id.feature_id, 2);
+			ft->setFeatureStatus(it_per_id.feature_id, PtsStatus::Bad); // 2
 			it_per_id.good_for_solving	 = false;
 			it_per_id.depth_inited		 = false;
 			it_per_id.need_triangulation = true;
 			// it_per_id.estimated_depth = localPoint.norm();
 		} else {
 			if (it_per_id.feature_per_frame.size() >= 4) {
-				ft->setFeatureStatus(it_per_id.feature_id, 1);
+				ft->setFeatureStatus(it_per_id.feature_id, PtsStatus::Not_Used); // 1
 			}
 			it_per_id.depth_inited	   = true;
 			it_per_id.good_for_solving = true;
@@ -488,7 +488,7 @@ void FeatureManager::removeOutlier(set<int> &outlierIndex) {
 		int index = it->first;
 		itSet	  = outlierIndex.find(index);
 		if (itSet != outlierIndex.end()) {
-			ft->setFeatureStatus(it->second.feature_id, -1);
+			ft->setFeatureStatus(it->second.feature_id, PtsStatus::Outlier); //-1
 			feature.erase(it);
 			outlier_features.insert(it->second.feature_id);
 			// printf("remove outlier %d \n", index);
@@ -509,7 +509,7 @@ void FeatureManager::removeBackShiftDepth(Eigen::Matrix3d marg_R, Eigen::Vector3
 			it.feature_per_frame.erase(it.feature_per_frame.begin());
 			if (it.feature_per_frame.size() < 2) {
 				feature.erase(_it);
-				ft->setFeatureStatus(_it->second.feature_id, -1);
+				ft->setFeatureStatus(_it->second.feature_id, PtsStatus::Outlier); //-1
 				continue;
 			} else {
 				Eigen::Vector3d pts_i	= uv_i * it.estimated_depth;
@@ -546,7 +546,7 @@ void FeatureManager::removeBack() {
 		else {
 			it->second.feature_per_frame.erase(it->second.feature_per_frame.begin());
 			if (it->second.feature_per_frame.size() == 0) {
-				ft->setFeatureStatus(it->second.feature_id, -1);
+				ft->setFeatureStatus(it->second.feature_id, PtsStatus::Outlier); //-1
 				feature.erase(it);
 			}
 		}
@@ -565,7 +565,7 @@ void FeatureManager::removeFront(int frame_count) {
 				continue;
 			it->second.feature_per_frame.erase(it->second.feature_per_frame.begin() + j);
 			if (it->second.feature_per_frame.size() == 0) {
-				ft->setFeatureStatus(it->second.feature_id, -1);
+				ft->setFeatureStatus(it->second.feature_id, PtsStatus::Outlier); //-1
 				feature.erase(it);
 			}
 		}
@@ -599,7 +599,5 @@ double FeatureManager::compensatedParallax2(const FeaturePerId &it_per_id, int f
 
 	ans = sqrt(du * du + dv * dv);
 	return ans;
-}
-return -1;
 #endif
 }

@@ -3,7 +3,7 @@
 # debug
 enable_perf_output: 1
 warn_imu_duration: 0
-use_mag: 1  # 使用磁力计
+use_mag: 0  # 使用磁力计
 
 
 #common parameters
@@ -77,7 +77,7 @@ enable_depth: 0
 
 #feature traker paprameters
 use_orb: 0              # use orb feature or not
-max_cnt: 120            # max feature number in feature tracking
+max_cnt: 200            # max feature number in feature tracking
 max_solve_cnt: 50       # Max Point for solve; highly influence performace, 后端求解的点数
 depth_estimate_baseline: 0.095
 thres_outlier : 3.0

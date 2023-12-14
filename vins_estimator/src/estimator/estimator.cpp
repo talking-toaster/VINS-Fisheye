@@ -1314,8 +1314,13 @@ double Estimator::reprojectionError(Matrix3d &Ri, Vector3d &Pi, Matrix3d &rici, 
 									Vector3d &Pj, Matrix3d &ricj, Vector3d &ticj, double depth, Vector3d &uvi,
 									Vector3d &uvj) {
 	Vector3d pts_w	= Ri * (rici * (depth * uvi) + tici) + Pi;
-	Vector3d pts_cj = ricj.transpose() * (Rj.transpose() * (pts_w - Pj) - ticj);
+	Vector3d pts_cj = ricj.transpose() * (Rj.transpose() * (pts_w - Pj) - ticj); // depth_j * uvj;
+#ifdef UNIT_SPHERE_ERROR
 	return (pts_cj.normalized() - uvj).norm();
+#else
+	double depth_j = pts_cj.z();
+	return (pts_cj / depth_j - uvj).norm();
+#endif
 }
 
 void Estimator::outliersRejection(set<int> &removeIndex) {
@@ -1329,15 +1334,16 @@ void Estimator::outliersRejection(set<int> &removeIndex) {
 		Vector3d pts_i = it_per_id.feature_per_frame[0].point;
 		double	 depth = it_per_id.estimated_depth;
 
-		Vector3d pts_w = Rs[imu_i] * (ric[it_per_id.main_cam] * (depth * pts_i) + tic[it_per_id.main_cam]) + Ps[imu_i];
-		// ROS_INFO("PT %d, STEREO %d w %3.2f %3.2f %3.2f drone %3.2f %3.2f %3.2f ptun %3.2f %3.2f %3.2f, depth %f",
-		//     it_per_id.feature_id,
-		//     it_per_id.feature_per_frame.front().is_stereo,
-		//     pts_w.x(), pts_w.y(), pts_w.z(),
-		//     Ps[imu_i].x(), Ps[imu_i].y(), Ps[imu_i].z(),
-		//     pts_i.x(), pts_i.y(), pts_i.z(),
-		//     depth
-		// );
+		// Vector3d pts_w = Rs[imu_i] * (ric[it_per_id.main_cam] * (depth * pts_i) + tic[it_per_id.main_cam]) +
+		// Ps[imu_i];
+		//  ROS_INFO("PT %d, STEREO %d w %3.2f %3.2f %3.2f drone %3.2f %3.2f %3.2f ptun %3.2f %3.2f %3.2f, depth %f",
+		//      it_per_id.feature_id,
+		//      it_per_id.feature_per_frame.front().is_stereo,
+		//      pts_w.x(), pts_w.y(), pts_w.z(),
+		//      Ps[imu_i].x(), Ps[imu_i].y(), Ps[imu_i].z(),
+		//      pts_i.x(), pts_i.y(), pts_i.z(),
+		//      depth
+		//  );
 
 		for (auto &it_per_frame : it_per_id.feature_per_frame) {
 

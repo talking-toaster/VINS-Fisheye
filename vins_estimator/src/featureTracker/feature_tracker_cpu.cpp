@@ -65,7 +65,9 @@ vector<cv::Point3f> PinholeFeatureTracker<CvMat>::undistortedPts(vector<cv::Poin
 		Eigen::Vector2d a(pts[i].x, pts[i].y);
 		Eigen::Vector3d b;
 		cam->liftProjective(a, b);
+#ifdef UNIT_SPHERE_ERROR
 		b.normalize();
+#endif
 		un_pts.push_back(cv::Point3f(b.x(), b.y(), b.z()));
 	}
 	return un_pts;
@@ -91,6 +93,9 @@ std::vector<cv::Point3f> PinholeFeatureTracker<CvMat>::ptsVelocity(vector<int> &
 				double v_x = (pts[i].x - it->second.x) / dt;
 				double v_y = (pts[i].y - it->second.y) / dt;
 				double v_z = (pts[i].z - it->second.z) / dt;
+#ifndef UNIT_SPHERE_ERROR
+				assert(v_z == 0 && "v_z should be zero");
+#endif
 				pts_velocity.push_back(cv::Point3f(v_x, v_y, v_z));
 			} else
 				pts_velocity.push_back(cv::Point3f(0, 0, 0));

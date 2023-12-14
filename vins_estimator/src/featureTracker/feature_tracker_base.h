@@ -43,6 +43,13 @@ typedef map<int, FeatureFramenoId>	FeatureFrame;	  // id - vector < pair < cam_i
 
 class Estimator;
 
+enum class PtsStatus {
+	Outlier,
+	Bad,
+	Not_Used,
+	Good,
+};
+
 namespace FeatureTracker {
 
 
@@ -65,9 +72,9 @@ class BaseFeatureTracker {
 	 * 2: Bad pt; Red
 	 * 3: Good pt for solving; Green
 	 */
-	void setFeatureStatus(int feature_id, int status) {
+	void setFeatureStatus(int feature_id, PtsStatus status) {
 		this->pts_status[feature_id] = status;
-		if (status < 0) {
+		if (status == PtsStatus::Outlier) {
 			removed_pts.insert(feature_id);
 		}
 	}
@@ -93,8 +100,8 @@ class BaseFeatureTracker {
 	void drawTrackImage(cv::Mat &img, vector<cv::Point2f> pts, vector<int> ids, map<int, cv::Point2f> prev_pts,
 						map<int, cv::Point2f> predictions = map<int, cv::Point2f>());
 
-	map<int, int> pts_status;
-	set<int>	  removed_pts;
+	map<int, PtsStatus> pts_status;
+	set<int>			removed_pts;
 
 	vector<camodocal::CameraPtr> m_camera;
 

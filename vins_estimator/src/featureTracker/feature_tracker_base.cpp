@@ -406,23 +406,23 @@ void BaseFeatureTracker::drawTrackImage(cv::Mat &img, vector<cv::Point2f> pts, v
 		// Just New point yellow
 		cv::Scalar color = cv::Scalar(0, 255, 255);
 		if (pts_status.find(ids[j]) != pts_status.end()) {
-			int status = pts_status[ids[j]];
-			if (status < 0) {
+			PtsStatus status = pts_status[ids[j]];
+			if (status == PtsStatus::Outlier) { //<0
 				// Removed points
-				color = cv::Scalar(0, 0, 0);
+				color = cv::Scalar(255, 0, 255);
 			}
 
-			if (status == 1) {
+			if (status == PtsStatus::Not_Used) {
 				// Good pt; But not used for solving; Blue
 				color = cv::Scalar(255, 0, 0);
 			}
 
-			if (status == 2) {
+			if (status == PtsStatus::Bad) {
 				// Bad pt; Red
 				color = cv::Scalar(0, 0, 255);
 			}
 
-			if (status == 3) {
+			if (status == PtsStatus::Good) {
 				// Good pt for solving; Green
 				color = cv::Scalar(0, 255, 0);
 			}
